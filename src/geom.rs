@@ -16,7 +16,7 @@
 
 use std::fmt::{Formatter, Result, Debug};
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub struct Point {
   pub x: f32,
   pub y: f32,

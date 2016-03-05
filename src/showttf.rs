@@ -14,20 +14,16 @@
 
 //! A simple renderer for TrueType fonts
 
-#![feature(test)]
-#![feature(old_io)]
-extern crate test;
-use self::test::Bencher;
+//extern crate test;
+//use self::test::Bencher;
 
 use std::collections::HashMap;
 use std::fmt::{Formatter, Display};
-use std::hash::{Hash, hash};
+//use std::hash::{Hash};
 use std::io::{Read, Write};
-// TODO: probably don't do this
-use std::old_io::Writer;
 use std::result::Result;
 use std::fs::File;
-use std::path::Path;
+//use std::path::Path;
 
 use geom::{Point, lerp, Affine, affine_pt};
 use raster::Raster;
@@ -46,10 +42,12 @@ impl Tag {
 
 impl Display for Tag {
   fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-    let mut w = Vec::new();
     let &Tag(tag) = self;
-    let _ = w.write_be_u32(tag);
-    f.write_str(&String::from_utf8(w).unwrap())
+    let buf = vec![((tag >> 24) & 0xff) as u8,
+        ((tag >> 16) & 0xff) as u8,
+        ((tag >> 8) & 0xff) as u8,
+        (tag & 0xff) as u8];
+    f.write_str(&String::from_utf8(buf).unwrap())
   }
 }
 
@@ -137,12 +135,11 @@ impl<'a> SimpleGlyph<'a> {
 
   fn points(&'a self) -> GlyphPoints<'a> {
     let data = self.data;
-    //println!("{}", data);
     let n_contours = self.number_of_contours();
     let insn_len_off = 10 + 2 * n_contours as usize;
     let n_points = get_u16(data, insn_len_off - 2).unwrap() as usize + 1;
-    let insn_len = get_u16(data, insn_len_off).unwrap();
-    let flags_ix = insn_len_off as usize + 2;
+    let insn_len = get_u16(data, insn_len_off).unwrap();  // insn_len
+    let flags_ix = insn_len_off + insn_len as usize + 2;
     let mut flags_size = 0;
     let mut x_size = 0;
     let mut points_remaining = n_points;
@@ -414,7 +411,7 @@ enum FontError {
 }
 
 fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
-  if (data.len() < 12) {
+  if data.len() < 12 {
     return Err(FontError::Invalid);
   }
   let version = get_u32(data, 0).unwrap();
@@ -454,7 +451,7 @@ fn dump_glyph(g: Glyph) {
       //println!("{} contours", s.number_of_contours())
       let mut p = s.points();
       for n in s.contour_sizes() {
-        for i in 0..n {
+        for _ in 0..n {
           println!("{:?}", p.next().unwrap());
         }
         println!("z");
@@ -514,8 +511,6 @@ struct GlyphBitmap {
 
 // lifetime elision will certainly be effective here
 fn render_glyph<'a>(f: &'a Font<'a>, glyph_id: u16, size: u32) -> Option<GlyphBitmap> {
-  let w = size;
-  let h = size;
   let ppem = f.head.units_per_em();
   let scale = (size as f32) / (ppem as f32);
   match f.get_glyph(glyph_id) {
@@ -544,10 +539,11 @@ fn render_glyph<'a>(f: &'a Font<'a>, glyph_id: u16, size: u32) -> Option<GlyphBi
   }
 }
 
-fn dump_pgm(glyph: &GlyphBitmap) {
-  let mut o = std::io::stdout();
-  o.write(format!("P5\n{} {}\n255\n", glyph.width, glyph.height).as_bytes());
-  o.write(&glyph.data);
+fn dump_pgm(glyph: &GlyphBitmap, out_filename: &str) {
+  let mut o = File::create(&out_filename).unwrap();
+  let _ = o.write(format!("P5\n{} {}\n255\n", glyph.width, glyph.height).as_bytes());
+  println!("data len = {}", glyph.data.len());
+  let _ = o.write(&glyph.data);
 }
 
 fn main() {
@@ -555,6 +551,7 @@ fn main() {
   let _ = args.next();
   let filename = args.next().unwrap();
   let glyph_id: u16 = args.next().unwrap().parse().unwrap();
+  let out_filename = args.next().unwrap();
   let mut f = File::open(&filename).unwrap();
   let mut data = Vec::new();
   match f.read_to_end(&mut data) {
@@ -562,15 +559,18 @@ fn main() {
     Ok(_) => match parse(&data) {
       Ok(font) => {
         match render_glyph(&font, glyph_id, 400) {
-          Some(glyph) => dump_pgm(&glyph),
+          Some(glyph) => dump_pgm(&glyph, &out_filename),
           None => println!("failed to render {} {}", filename, glyph_id)
         }
       },
-      Err(e) => println!("failed to parse {}", filename)
+      Err(_) => println!("failed to parse {}", filename)
     }
   }
 
 }
+
+/*
+TODO: get these benchmarks to work
 
 fn glyphbench(b: &mut Bencher, size: u32) {
   let filename = "/Users/raph/Downloads/wt024.ttf";
@@ -610,3 +610,4 @@ fn glyph020(b: &mut Bencher) {
 fn glyph010(b: &mut Bencher) {
   glyphbench(b, 10)
 }
+*/

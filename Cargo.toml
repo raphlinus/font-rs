@@ -1,0 +1,11 @@
+[package]
+name = "font-rs"
+version = "0.0.1"
+license = "Apache-2.0"
+authors = [ "Raph Levien <raph@google.com>" ]
+description = "A font renderer written (mostly) in pure, safe Rust"
+repository = "https://github.com/google/font-rs"
+
+[[bin]]
+name = "showttf"
+doc = false
