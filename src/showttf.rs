@@ -415,20 +415,20 @@ fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
     return Err(FontError::Invalid);
   }
   let version = get_u32(data, 0).unwrap();
-  let numTables = get_u16(data, 4).unwrap() as usize;
-  let searchRange = get_u16(data, 6).unwrap();
-  let entrySelector = get_u16(data, 8).unwrap();
-  let rangeShift = get_u16(data, 10).unwrap();
-  let mut tables = HashMap::new();
-  for i in 0..numTables {
+  let num_tables = get_u16(data, 4).unwrap() as usize;
+  let search_range = get_u16(data, 6).unwrap();
+  let entry_selector = get_u16(data, 8).unwrap();
+  let range_shift = get_u16(data, 10).unwrap();
+  let mut tables = HashMap::with_capacity(num_tables);
+  for i in 0..num_tables {
     let header = &data[12 + i*16 .. 12 + (i + 1) * 16];
     let tag = get_u32(header, 0).unwrap();
-    let checkSum = get_u32(header, 4).unwrap();
+    let check_sum = get_u32(header, 4).unwrap();
     let offset = get_u32(header, 8).unwrap();
     let length = get_u32(header, 12).unwrap();
-    let tableData = &data[offset as usize .. (offset + length) as usize];
+    let table_data = &data[offset as usize .. (offset + length) as usize];
     //println!("{}: {}", Tag(tag), tableData.len())
-    tables.insert(Tag(tag), tableData);
+    tables.insert(Tag(tag), table_data);
   }
   let head = Head(*tables.get(&Tag::from_str("head")).unwrap()); // todo: don't fail
   let maxp = Maxp{data: *tables.get(&Tag::from_str("maxp")).unwrap()};
@@ -540,7 +540,7 @@ fn render_glyph<'a>(f: &'a Font<'a>, glyph_id: u16, size: u32) -> Option<GlyphBi
 }
 
 fn dump_pgm(glyph: &GlyphBitmap, out_filename: &str) {
-  let mut o = File::create(&out_filename).unwrap();
+  let mut o = File::create(&out_filename).expect("Failed to open output file");
   let _ = o.write(format!("P5\n{} {}\n255\n", glyph.width, glyph.height).as_bytes());
   println!("data len = {}", glyph.data.len());
   let _ = o.write(&glyph.data);
@@ -549,9 +549,9 @@ fn dump_pgm(glyph: &GlyphBitmap, out_filename: &str) {
 fn main() {
   let mut args = std::env::args();
   let _ = args.next();
-  let filename = args.next().unwrap();
-  let glyph_id: u16 = args.next().unwrap().parse().unwrap();
-  let out_filename = args.next().unwrap();
+  let filename = args.next().expect("Parameter expected: filename");
+  let glyph_id: u16 = args.next().expect("Parameter expected: glyph id").parse().unwrap();
+  let out_filename = args.next().expect("Parameter expected: output filename");
   let mut f = File::open(&filename).unwrap();
   let mut data = Vec::new();
   match f.read_to_end(&mut data) {
