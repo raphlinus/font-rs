@@ -30,12 +30,11 @@ pub struct Raster {
   a: Vec<f32>
 }
 
-/*
+#[cfg(feature="sse")]
 #[link(name = "accumulate")]
 extern {
   fn accumulate_sse(src: *const f32, dst: *mut u8, n: u32);
 }
-*/
 
 // TODO: is there a faster way? (investigate whether approx recip is good enough)
 fn recip(x: f32) -> f32 {
@@ -125,6 +124,7 @@ impl Raster {
     self.draw_line(&p, p2);
   }
 
+/*
   fn get_bitmap_fancy(&self) -> Vec<u8> {
     let mut acc = 0.0;
     // This would translate really well to SIMD
@@ -134,11 +134,12 @@ impl Raster {
       //(255.5 * (0.5 + 0.4 * acc)) as u8
     }).collect()
   }
+*/
 
-/*
-  pub fn get_bitmap_sse(&self) -> Vec<u8> {
+  #[cfg(feature="sse")]
+  pub fn get_bitmap(&self) -> Vec<u8> {
     let dst_size = self.w * self.h;
-    let dst_cap = (dst_size + 3) & -4;
+    let dst_cap = (dst_size + 3) & !3;
     let mut r: Vec<u8> = Vec::with_capacity(dst_cap);
     unsafe {
       accumulate_sse(self.a.as_ptr(), r.as_mut_ptr(), dst_cap as u32);
@@ -146,8 +147,8 @@ impl Raster {
     }
     r
   }
-*/
 
+  #[cfg(not(feature="sse"))]
   pub fn get_bitmap(&self) -> Vec<u8> {
     let mut acc = 0.0;
     (0..self.w * self.h).map(|i| {

@@ -3,13 +3,11 @@
 This is a font renderer written (mostly) in pure, safe Rust. There is an optional
 SIMD module for cumulative sum, currently written in C++ SSE3 intrinsics.
 
-The current state of the code is quite rough. It's not known to compile with
-stable Rust 1.0 (the original version was written well before 1.0 stabilized),
-it doesn't handle composite glyphs, the code isn't organized with Cargo, and
-it's basically not ready for prime time. However, it ran well enough (at least
-at one time) to run benchmarks, and those benchmarks suggest extremely promising
-performance compared with Freetype and freetype-go (the loose port of Freetype
-to Go).
+The current state of the code is quite rough. It doesn't handle composite
+glyphs, the code isn't well organized, and it's basically not ready for prime
+time. However, it runs well enough to run benchmarks, and those benchmarks
+suggest extremely promising performance compared with Freetype and freetype-go
+(the loose port of Freetype to Go).
 
 The rasterizer is basically very similar in design to
 [libart](https://people.gnome.org/~mathieu/libart/internals.html), except that

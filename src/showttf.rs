@@ -25,6 +25,8 @@ use std::result::Result;
 use std::fs::File;
 //use std::path::Path;
 
+use std::time::SystemTime;
+
 use geom::{Point, lerp, Affine, affine_pt};
 use raster::Raster;
 
@@ -558,9 +560,25 @@ fn main() {
     Err(e) => println!("failed to read {}, {}", filename, e),
     Ok(_) => match parse(&data) {
       Ok(font) => {
-        match render_glyph(&font, glyph_id, 400) {
-          Some(glyph) => dump_pgm(&glyph, &out_filename),
-          None => println!("failed to render {} {}", filename, glyph_id)
+        if out_filename == "__bench__" {
+          for size in 1..201 {
+            let start = SystemTime::now();
+            let n_iter = 1000;
+            for _ in 0..n_iter {
+              match render_glyph(&font, glyph_id, size) {
+                Some(_glyph) => (),
+                None => println!("failed to render {} {}", filename, glyph_id)
+              }
+            }
+            let elapsed = start.elapsed().unwrap();
+            let elapsed = elapsed.as_secs() as f64 + 1e-9 * (elapsed.subsec_nanos() as f64);
+            println!("{} {}", size, elapsed * (1e6 / n_iter as f64));
+          }
+        } else {
+          match render_glyph(&font, glyph_id, 400) {
+            Some(glyph) => dump_pgm(&glyph, &out_filename),
+            None => println!("failed to render {} {}", filename, glyph_id)
+          }
         }
       },
       Err(_) => println!("failed to parse {}", filename)

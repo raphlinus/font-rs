@@ -5,7 +5,14 @@ license = "Apache-2.0"
 authors = [ "Raph Levien <raph@google.com>" ]
 description = "A font renderer written (mostly) in pure, safe Rust"
 repository = "https://github.com/google/font-rs"
+build = "build.rs"
+
+[features]
+sse = []
 
 [[bin]]
 name = "showttf"
 doc = false
+
+[build-dependencies]
+gcc = "0.3"
