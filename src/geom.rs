@@ -18,41 +18,41 @@ use std::fmt::{Formatter, Result, Debug};
 
 #[derive(Copy, Clone)]
 pub struct Point {
-  pub x: f32,
-  pub y: f32,
+    pub x: f32,
+    pub y: f32,
 }
 
 impl Point {
-  // could be more generic, use conversion trait
-  pub fn new(x: i16, y: i16) -> Point { Point{ x: x as f32, y: y as f32 } }
+    // could be more generic, use conversion trait
+    pub fn new(x: i16, y: i16) -> Point { Point{ x: x as f32, y: y as f32 } }
 }
 
 impl Debug for Point {
-  fn fmt(&self, f: &mut Formatter) -> Result {
-    write!(f, "({}, {})", self.x, self.y)
-  }
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
 }
 
 // maybe should be a static method of Point?
 pub fn lerp(t: f32, p0: &Point, p1: &Point) -> Point {
-  Point { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) }
+    Point { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) }
 }
 
 pub struct Affine {
-  a: f32,
-  b: f32,
-  c: f32,
-  d: f32,
-  e: f32,
-  f: f32,
+    a: f32,
+    b: f32,
+    c: f32,
+    d: f32,
+    e: f32,
+    f: f32,
 }
 
 impl Affine {
-  pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Affine {
-    Affine{a: a, b: b, c: c, d: d, e: e, f: f}
-  }
+    pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Affine {
+        Affine{a: a, b: b, c: c, d: d, e: e, f: f}
+    }
 }
 
 pub fn affine_pt(z: &Affine, p: &Point) -> Point {
-  Point{x: z.a * p.x + z.c * p.y + z.e, y: z.b * p.x + z.d * p.y + z.f}
+    Point{x: z.a * p.x + z.c * p.y + z.e, y: z.b * p.x + z.d * p.y + z.f}
 }
