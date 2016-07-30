@@ -38,6 +38,7 @@ pub fn lerp(t: f32, p0: &Point, p1: &Point) -> Point {
     Point { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) }
 }
 
+#[derive(Debug)]
 pub struct Affine {
     a: f32,
     b: f32,
@@ -50,6 +51,18 @@ pub struct Affine {
 impl Affine {
     pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Affine {
         Affine{a: a, b: b, c: c, d: d, e: e, f: f}
+    }
+
+    /// Concatenate two affine transforms.
+    pub fn concat(t1: &Affine, t2: &Affine) -> Affine {
+        Affine {
+            a: t1.a * t2.a + t1.c * t2.b,
+            b: t1.b * t2.a + t1.d * t2.b,
+            c: t1.a * t2.c + t1.c * t2.d,
+            d: t1.b * t2.c + t1.d * t2.d,
+            e: t1.a * t2.e + t1.c * t2.f + t1.e,
+            f: t1.b * t2.e + t1.d * t2.f + t1.f,
+        }
     }
 }
 
