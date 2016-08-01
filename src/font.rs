@@ -18,20 +18,12 @@
 //use self::test::Bencher;
 
 use std::collections::HashMap;
+use std::fmt;
 use std::fmt::{Formatter, Display};
-//use std::hash::{Hash};
-use std::io::{Read, Write};
 use std::result::Result;
-use std::fs::File;
-//use std::path::Path;
-
-use std::time::SystemTime;
 
 use geom::{Point, lerp, Affine, affine_pt};
 use raster::Raster;
-
-mod geom;
-mod raster;
 
 #[derive(PartialEq, Eq, Hash)]
 struct Tag(u32);
@@ -43,7 +35,7 @@ impl Tag {
 }
 
 impl Display for Tag {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let &Tag(tag) = self;
         let buf = vec![((tag >> 24) & 0xff) as u8,
                 ((tag >> 16) & 0xff) as u8,
@@ -63,6 +55,10 @@ fn get_u16(data: &[u8], off: usize) -> Option<u16> {
 
 fn get_i16(data: &[u8], off: usize) -> Option<i16> {
     get_u16(data, off).map(|x| x as i16)
+}
+
+fn get_f2_14(data: &[u8], off: usize) -> Option<f32> {
+    get_i16(data, off).map(|x| x as f32 * (1.0 / (1 << 14) as f32))
 }
 
 fn get_u32(data: &[u8], off: usize) -> Option<u32> {
@@ -112,6 +108,14 @@ impl<'a> Loca<'a> {
     }
 }
 
+fn get_bbox_raw(data: &[u8]) -> (i16, i16, i16, i16) {
+    (get_i16(data, 2).unwrap(),
+     get_i16(data, 4).unwrap(),
+     get_i16(data, 6).unwrap(),
+     get_i16(data, 8).unwrap(),
+    )
+}
+
 enum Glyph<'a> {
     EmptyGlyph,
     SimpleGlyph(SimpleGlyph<'a>),
@@ -128,11 +132,7 @@ impl<'a> SimpleGlyph<'a> {
     }
 
     fn bbox(&'a self) -> (i16, i16, i16, i16) {
-        (get_i16(self.data, 2).unwrap(),
-         get_i16(self.data, 4).unwrap(),
-         get_i16(self.data, 6).unwrap(),
-         get_i16(self.data, 8).unwrap(),
-        )
+        get_bbox_raw(self.data)
     }
 
     fn points(&'a self) -> GlyphPoints<'a> {
@@ -168,9 +168,10 @@ impl<'a> SimpleGlyph<'a> {
             flags_ix: flags_ix, x_ix: x_ix, y_ix: y_ix }
     }
 
-    fn contour_sizes(&'a self) -> ContourSizes<'a> {
+    fn contour_sizes(&self) -> ContourSizes {
         let n_contours = self.number_of_contours();
-        ContourSizes{data: self.data,
+        ContourSizes {
+            data: self.data,
             contours_remaining: n_contours as usize,
             ix: 10,
             offset: -1,
@@ -280,17 +281,191 @@ struct CompoundGlyph<'a> {
     data: &'a [u8]
 }
 
-struct Font<'a> {
-    version: u32,
-    tables: HashMap<Tag, &'a [u8]>,
+struct Components<'a> {
+    data: &'a [u8],
+    more: bool,
+    ix: usize,
+}
+
+const ARG_1_AND_2_ARE_WORDS: u16 = 1 << 0;
+const WE_HAVE_A_SCALE: u16 = 1 << 3;
+const MORE_COMPONENTS: u16 = 1 << 5;
+const WE_HAVE_AN_X_AND_Y_SCALE: u16 = 1 << 6;
+const WE_HAVE_A_TWO_BY_TWO: u16 = 1 << 7;
+
+impl<'a> Iterator for Components<'a> {
+    type Item = (u16, Affine);
+    fn next(&mut self) -> Option<(u16, Affine)> {
+        if !self.more { return None; }
+        let flags = get_u16(self.data, self.ix).unwrap();
+        self.ix += 2;
+        let glyph_index = get_u16(self.data, self.ix).unwrap();
+        self.ix += 2;
+        let arg1;
+        let arg2;
+        if (flags & ARG_1_AND_2_ARE_WORDS) != 0 {
+            arg1 = get_i16(self.data, self.ix).unwrap();
+            self.ix += 2;
+            arg2 = get_i16(self.data, self.ix).unwrap();
+            self.ix += 2;
+        } else {
+            arg1 = self.data[self.ix] as i16;
+            self.ix += 1;
+            arg2 = self.data[self.ix] as i16;
+            self.ix += 1;
+        }
+        let mut a = 1.0;
+        let mut b = 0.0;
+        let mut c = 0.0;
+        let mut d = 1.0;
+        if (flags & WE_HAVE_A_TWO_BY_TWO) != 0 {
+            a = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+            b = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+            c = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+            d = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+        } else if (flags & WE_HAVE_AN_X_AND_Y_SCALE) != 0 {
+            a = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+            d = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+        } else if (flags & WE_HAVE_A_SCALE) != 0 {
+            a = get_f2_14(self.data, self.ix).unwrap();
+            self.ix += 2;
+            d = a;
+        }
+        // TODO: handle non-ARGS_ARE_XY_VALUES case
+        let x = arg1 as f32;
+        let y = arg2 as f32;
+        let z = Affine::new(a, b, c, d, x, y);
+        self.more = (flags & MORE_COMPONENTS) != 0;
+        Some((glyph_index, z))
+    }
+}
+
+impl<'a> CompoundGlyph<'a> {
+    fn bbox(&self) -> (i16, i16, i16, i16) {
+        get_bbox_raw(self.data)
+    }
+
+    fn components(&self) -> Components {
+        Components {
+            data: self.data,
+            ix: 10,
+            more: true,
+        }
+    }
+}
+
+pub struct Font<'a> {
+    _version: u32,
+    _tables: HashMap<Tag, &'a [u8]>,
     head: Head<'a>,
     maxp: Maxp<'a>,
     loca: Option<Loca<'a>>,
     glyf: Option<&'a [u8]>,
 }
 
+
+struct Metrics {
+    l: i32,
+    t: i32,
+    r: i32,
+    b: i32,
+}
+
+impl Metrics {
+    fn width(&self) -> usize {
+        (self.r - self.l) as usize
+    }
+
+    fn height(&self) -> usize {
+        (self.b - self.t) as usize
+    }
+}
+
 impl<'a> Font<'a> {
-    fn get_glyph(&'a self, glyph_ix: u16) -> Option<Glyph<'a>> {
+    fn metrics_and_affine(&self, xmin: i16, ymin: i16, xmax: i16, ymax: i16, size:u32) ->
+            (Metrics, Affine) {
+        let ppem = self.head.units_per_em();
+        let scale = (size as f32) / (ppem as f32);
+        let l = (xmin as f32 * scale).floor() as i32;
+        let t = (ymax as f32 * -scale).floor() as i32;
+        let r = (xmax as f32 * scale).ceil() as i32;
+        let b = (ymin as f32 * -scale).ceil() as i32;
+        let metrics = Metrics { l: l, t: t, r: r, b: b };
+        let z = Affine::new(scale, 0.0, 0.0, -scale, -l as f32, -t as f32);
+        (metrics, z)
+    }
+
+    fn render_glyph_inner(&self, raster: &mut Raster, z: &Affine, glyph: &Glyph) {
+        match *glyph {
+            Glyph::SimpleGlyph(ref s) => {
+                let mut p = s.points();
+                for n in s.contour_sizes() {
+                    //println!("n = {}", n);
+                    //let v = path_from_pts(p.by_ref().take(n)).collect::<Vec<_>>();
+                    //println!("size = {}", v.len());
+                    draw_path(raster, z, &mut path_from_pts(p.by_ref().take(n)));
+                }
+            }
+            Glyph::CompoundGlyph(ref c) => {
+                for (glyph_index, affine) in c.components() {
+                    //println!("component {} {:?}", glyph_index, affine);
+                    let concat = Affine::concat(z, &affine);
+                    if let Some(component_glyph) = self.get_glyph(glyph_index) {
+                        self.render_glyph_inner(raster, &concat, &component_glyph);
+                    }
+                }
+            }
+            _ => {
+                println!("unhandled glyph case");
+            }
+        }
+    }
+
+    pub fn render_glyph(&self, glyph_id: u16, size: u32) -> Option<GlyphBitmap> {
+        let glyph = self.get_glyph(glyph_id);
+        match glyph {
+            Some(Glyph::SimpleGlyph(ref s)) => {
+                let (xmin, ymin, xmax, ymax) = s.bbox();
+                let (metrics, z) = self.metrics_and_affine(xmin, ymin, xmax, ymax, size);
+                let mut raster = Raster::new(metrics.width(), metrics.height());
+                //dump_glyph(SimpleGlyph(s));
+                self.render_glyph_inner(&mut raster, &z, glyph.as_ref().unwrap());
+                //None
+                Some(GlyphBitmap {
+                    width: metrics.width(),
+                    height: metrics.height(),
+                    left: metrics.l,
+                    top: metrics.t,
+                    data: raster.get_bitmap()
+                })
+            },
+            Some(Glyph::CompoundGlyph(ref c)) => {
+                let (xmin, ymin, xmax, ymax) = c.bbox();
+                let (metrics, z) = self.metrics_and_affine(xmin, ymin, xmax, ymax, size);
+                let mut raster = Raster::new(metrics.width(), metrics.height());
+                self.render_glyph_inner(&mut raster, &z, glyph.as_ref().unwrap());
+                Some(GlyphBitmap {
+                    width: metrics.width(),
+                    height: metrics.height(),
+                    left: metrics.l,
+                    top: metrics.t,
+                    data: raster.get_bitmap()
+                })
+            }
+            _ => {
+                println!("glyph {} error", glyph_id);
+                None
+            }
+        }
+    }
+
+    fn get_glyph(&self, glyph_ix: u16) -> Option<Glyph> {
         if glyph_ix >= self.maxp.num_glyphs() { return None }
         let fmt = self.head.index_to_loc_format();
         match self.loca {
@@ -320,7 +495,7 @@ enum PathOp {
     QuadTo(Point, Point),
 }
 
-use PathOp::{MoveTo, LineTo, QuadTo};
+use self::PathOp::{MoveTo, LineTo, QuadTo};
 
 struct BezPathOps<T> {
     inner: T,
@@ -408,35 +583,36 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
     }
 }
 
-enum FontError {
+pub enum FontError {
     Invalid
 }
 
-fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
+pub fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
     if data.len() < 12 {
         return Err(FontError::Invalid);
     }
     let version = get_u32(data, 0).unwrap();
-    let numTables = get_u16(data, 4).unwrap() as usize;
-    let searchRange = get_u16(data, 6).unwrap();
-    let entrySelector = get_u16(data, 8).unwrap();
-    let rangeShift = get_u16(data, 10).unwrap();
+    let num_tables = get_u16(data, 4).unwrap() as usize;
+    let _search_range = get_u16(data, 6).unwrap();
+    let _entry_selector = get_u16(data, 8).unwrap();
+    let _range_shift = get_u16(data, 10).unwrap();
     let mut tables = HashMap::new();
-    for i in 0..numTables {
+    for i in 0..num_tables {
         let header = &data[12 + i*16 .. 12 + (i + 1) * 16];
         let tag = get_u32(header, 0).unwrap();
-        let checkSum = get_u32(header, 4).unwrap();
+        let _check_sum = get_u32(header, 4).unwrap();
         let offset = get_u32(header, 8).unwrap();
         let length = get_u32(header, 12).unwrap();
-        let tableData = &data[offset as usize .. (offset + length) as usize];
+        let table_data = &data[offset as usize .. (offset + length) as usize];
         //println!("{}: {}", Tag(tag), tableData.len())
-        tables.insert(Tag(tag), tableData);
+        tables.insert(Tag(tag), table_data);
     }
     let head = Head(*tables.get(&Tag::from_str("head")).unwrap()); // todo: don't fail
     let maxp = Maxp{data: *tables.get(&Tag::from_str("maxp")).unwrap()};
     let loca = tables.get(&Tag::from_str("loca")).map(|&data| Loca(data));
     let glyf = tables.get(&Tag::from_str("glyf")).map(|&data| data);
-    let f = Font{version: version, tables: tables,
+    let f = Font{_version: version,
+        _tables: tables,
         head: head,
         maxp: maxp,
         loca: loca,
@@ -446,6 +622,7 @@ fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
     Ok(f)
 }
 
+/*
 fn dump_glyph(g: Glyph) {
     match g {
         Glyph::EmptyGlyph => println!("empty"),
@@ -468,7 +645,9 @@ fn dump_glyph(g: Glyph) {
         _ => println!("other")
     }
 }
+*/
 
+/*
 fn dump(data: Vec<u8>) {
     println!("length is {}", data.len());
     match parse(&data) {
@@ -485,6 +664,7 @@ fn dump(data: Vec<u8>) {
         _ => ()
     }
 }
+*/
 
 fn draw_path<I: Iterator<Item=PathOp>>(r: &mut Raster, z: &Affine, path: &mut I) {
     let mut lastp = Point::new(0, 0);
@@ -503,88 +683,12 @@ fn draw_path<I: Iterator<Item=PathOp>>(r: &mut Raster, z: &Affine, path: &mut I)
     }
 }
 
-struct GlyphBitmap {
-    width: usize,
-    height: usize,
-    left: i32,
-    top: i32,
-    data: Vec<u8>,
-}
-
-// lifetime elision will certainly be effective here
-fn render_glyph<'a>(f: &'a Font<'a>, glyph_id: u16, size: u32) -> Option<GlyphBitmap> {
-    let ppem = f.head.units_per_em();
-    let scale = (size as f32) / (ppem as f32);
-    match f.get_glyph(glyph_id) {
-        Some(Glyph::SimpleGlyph(s)) => {
-            let (xmin, ymin, xmax, ymax) = s.bbox();
-            let l = (xmin as f32 * scale).floor() as i32;
-            let t = (ymax as f32 * -scale).floor() as i32;
-            let r = (xmax as f32 * scale).ceil() as i32;
-            let b = (ymin as f32 * -scale).ceil() as i32;
-            let w = (r - l) as usize;
-            let h = (b - t) as usize;
-            let mut raster = Raster::new(w, h);
-            let z = Affine::new(scale, 0.0, 0.0, -scale, -l as f32, -t as f32);
-            //dump_glyph(SimpleGlyph(s));
-            let mut p = s.points();
-            for n in s.contour_sizes() {
-                //println!("n = {}", n);
-                draw_path(&mut raster, &z, &mut path_from_pts(p.by_ref().take(n)));
-            }
-            Some(GlyphBitmap{width: w, height: h, left: l, top: t, data: raster.get_bitmap()})
-        },
-        _ => {
-            println!("glyph {} error", glyph_id);
-            None
-        }
-    }
-}
-
-fn dump_pgm(glyph: &GlyphBitmap, out_filename: &str) {
-    let mut o = File::create(&out_filename).unwrap();
-    let _ = o.write(format!("P5\n{} {}\n255\n", glyph.width, glyph.height).as_bytes());
-    println!("data len = {}", glyph.data.len());
-    let _ = o.write(&glyph.data);
-}
-
-fn main() {
-    let mut args = std::env::args();
-    let _ = args.next();
-    let filename = args.next().unwrap();
-    let glyph_id: u16 = args.next().unwrap().parse().unwrap();
-    let out_filename = args.next().unwrap();
-    let mut f = File::open(&filename).unwrap();
-    let mut data = Vec::new();
-    match f.read_to_end(&mut data) {
-        Err(e) => println!("failed to read {}, {}", filename, e),
-        Ok(_) => match parse(&data) {
-            Ok(font) => {
-                if out_filename == "__bench__" {
-                    for size in 1..201 {
-                        let start = SystemTime::now();
-                        let n_iter = 1000;
-                        for _ in 0..n_iter {
-                            match render_glyph(&font, glyph_id, size) {
-                                Some(_glyph) => (),
-                                None => println!("failed to render {} {}", filename, glyph_id)
-                            }
-                        }
-                        let elapsed = start.elapsed().unwrap();
-                        let elapsed = elapsed.as_secs() as f64 + 1e-9 * (elapsed.subsec_nanos() as f64);
-                        println!("{} {}", size, elapsed * (1e6 / n_iter as f64));
-                    }
-                } else {
-                    match render_glyph(&font, glyph_id, 400) {
-                        Some(glyph) => dump_pgm(&glyph, &out_filename),
-                        None => println!("failed to render {} {}", filename, glyph_id)
-                    }
-                }
-            },
-            Err(_) => println!("failed to parse {}", filename)
-        }
-    }
-
+pub struct GlyphBitmap {
+    pub width: usize,
+    pub height: usize,
+    pub left: i32,
+    pub top: i32,
+    pub data: Vec<u8>,
 }
 
 /*
