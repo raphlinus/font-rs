@@ -1,7 +1,7 @@
 # font-rs
 
 This is a font renderer written (mostly) in pure, safe Rust. There is an optional
-SIMD module for cumulative sum, currently written in C++ SSE3 intrinsics.
+SIMD module for cumulative sum, currently written in C SSE3 intrinsics.
 
 The current state of the code is quite rough. The code isn't well organized,
 and it's basically not ready for prime time. However, it runs well enough to
