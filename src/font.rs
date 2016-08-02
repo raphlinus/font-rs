@@ -117,9 +117,9 @@ fn get_bbox_raw(data: &[u8]) -> (i16, i16, i16, i16) {
 }
 
 enum Glyph<'a> {
-    EmptyGlyph,
-    SimpleGlyph(SimpleGlyph<'a>),
-    CompoundGlyph(CompoundGlyph<'a>),
+    Empty,
+    Simple(SimpleGlyph<'a>),
+    Compound(CompoundGlyph<'a>),
 }
 
 struct SimpleGlyph<'a> {
@@ -287,7 +287,7 @@ struct Components<'a> {
     ix: usize,
 }
 
-const ARG_1_AND_2_ARE_WORDS: u16 = 1 << 0;
+const ARG_1_AND_2_ARE_WORDS: u16 = 1;
 const WE_HAVE_A_SCALE: u16 = 1 << 3;
 const MORE_COMPONENTS: u16 = 1 << 5;
 const WE_HAVE_AN_X_AND_Y_SCALE: u16 = 1 << 6;
@@ -403,7 +403,7 @@ impl<'a> Font<'a> {
 
     fn render_glyph_inner(&self, raster: &mut Raster, z: &Affine, glyph: &Glyph) {
         match *glyph {
-            Glyph::SimpleGlyph(ref s) => {
+            Glyph::Simple(ref s) => {
                 let mut p = s.points();
                 for n in s.contour_sizes() {
                     //println!("n = {}", n);
@@ -412,7 +412,7 @@ impl<'a> Font<'a> {
                     draw_path(raster, z, &mut path_from_pts(p.by_ref().take(n)));
                 }
             }
-            Glyph::CompoundGlyph(ref c) => {
+            Glyph::Compound(ref c) => {
                 for (glyph_index, affine) in c.components() {
                     //println!("component {} {:?}", glyph_index, affine);
                     let concat = Affine::concat(z, &affine);
@@ -430,7 +430,7 @@ impl<'a> Font<'a> {
     pub fn render_glyph(&self, glyph_id: u16, size: u32) -> Option<GlyphBitmap> {
         let glyph = self.get_glyph(glyph_id);
         match glyph {
-            Some(Glyph::SimpleGlyph(ref s)) => {
+            Some(Glyph::Simple(ref s)) => {
                 let (xmin, ymin, xmax, ymax) = s.bbox();
                 let (metrics, z) = self.metrics_and_affine(xmin, ymin, xmax, ymax, size);
                 let mut raster = Raster::new(metrics.width(), metrics.height());
@@ -445,7 +445,7 @@ impl<'a> Font<'a> {
                     data: raster.get_bitmap()
                 })
             },
-            Some(Glyph::CompoundGlyph(ref c)) => {
+            Some(Glyph::Compound(ref c)) => {
                 let (xmin, ymin, xmax, ymax) = c.bbox();
                 let (metrics, z) = self.metrics_and_affine(xmin, ymin, xmax, ymax, size);
                 let mut raster = Raster::new(metrics.width(), metrics.height());
@@ -472,13 +472,13 @@ impl<'a> Font<'a> {
             Some(ref loca) => match (loca.get_off(glyph_ix, fmt), loca.get_off(glyph_ix + 1, fmt), self.glyf) {
                 (Some(off0), Some(off1), Some(glyf)) =>
                     if off0 == off1 {
-                        Some(Glyph::EmptyGlyph)
+                        Some(Glyph::Empty)
                     } else {
                         let glyph_data = &glyf[off0 as usize .. off1 as usize];
                         if get_i16(glyph_data, 0) == Some(-1) {
-                            Some(Glyph::CompoundGlyph(CompoundGlyph{data: glyph_data}))
+                            Some(Glyph::Compound(CompoundGlyph{data: glyph_data}))
                         } else {
-                            Some(Glyph::SimpleGlyph(SimpleGlyph{data: glyph_data}))
+                            Some(Glyph::Simple(SimpleGlyph{data: glyph_data}))
                         }
                     },
                 (_, _, _) => None
@@ -587,7 +587,7 @@ pub enum FontError {
     Invalid
 }
 
-pub fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
+pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     if data.len() < 12 {
         return Err(FontError::Invalid);
     }
@@ -625,8 +625,8 @@ pub fn parse<'a>(data: &'a [u8]) -> Result<Font<'a>, FontError> {
 /*
 fn dump_glyph(g: Glyph) {
     match g {
-        Glyph::EmptyGlyph => println!("empty"),
-        Glyph::SimpleGlyph(s) => {
+        Glyph::Empty => println!("empty"),
+        Glyph::Simple(s) => {
             //println!("{} contours", s.number_of_contours())
             let mut p = s.points();
             for n in s.contour_sizes() {
