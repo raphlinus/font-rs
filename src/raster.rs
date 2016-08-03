@@ -36,12 +36,12 @@ extern {
 
 // TODO: is there a faster way? (investigate whether approx recip is good enough)
 fn recip(x: f32) -> f32 {
-    1.0f32 / x
+    x.recip()
 }
 
 impl Raster {
     pub fn new(w: usize, h: usize) -> Raster {
-        Raster{ w: w, h: h, a: vec!(0.0f32; w * h + 4) }
+        Raster{ w: w, h: h, a: vec!(0.0; w * h + 4) }
     }
 
     pub fn draw_line(&mut self, p0: &Point, p1: &Point) {
@@ -223,10 +223,10 @@ fn empty400(b: &mut Bencher) {
 
 #[bench]
 fn alloc400(b: &mut Bencher) {
-    b.iter(|| Vec::from_elem(400 * 400 + 1, 0.0f32))
+    b.iter(|| Vec::from_elem(400 * 400 + 1, 0.0))
 }
 
 #[bench]
 fn alloc200(b: &mut Bencher) {
-    b.iter(|| Vec::from_elem(200 * 200 + 1, 0.0f32))
+    b.iter(|| Vec::from_elem(200 * 200 + 1, 0.0))
 }
