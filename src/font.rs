@@ -667,7 +667,7 @@ fn dump(data: Vec<u8>) {
 */
 
 fn draw_path<I: Iterator<Item=PathOp>>(r: &mut Raster, z: &Affine, path: &mut I) {
-    let mut lastp = Point::new(0, 0);
+    let mut lastp = Point::new(0i16, 0i16);
     for op in path {
         match op {
             MoveTo(p) => lastp = p,

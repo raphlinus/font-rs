@@ -24,7 +24,7 @@ pub struct Point {
 
 impl Point {
     // could be more generic, use conversion trait
-    pub fn new(x: i16, y: i16) -> Point { Point{ x: x as f32, y: y as f32 } }
+    pub fn new<T>(x: T, y: T) -> Point where T: Into<f32> { Point{ x: x.into(), y: y.into() } }
 }
 
 impl Debug for Point {
