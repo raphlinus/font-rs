@@ -24,17 +24,16 @@ pub struct Point {
 
 impl Point {
     pub fn new<T>(x: T, y: T) -> Point where T: Into<f32> { Point{ x: x.into(), y: y.into() } }
+
+    pub fn lerp(t: f32, p0: &Self, p1: &Self) -> Self {
+        Point { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) }
+    }
 }
 
 impl Debug for Point {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "({}, {})", self.x, self.y)
     }
-}
-
-// maybe should be a static method of Point?
-pub fn lerp(t: f32, p0: &Point, p1: &Point) -> Point {
-    Point { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) }
 }
 
 #[derive(Debug)]

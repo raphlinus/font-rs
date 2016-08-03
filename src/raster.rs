@@ -16,7 +16,7 @@
 
 use std::cmp::min;
 
-use geom::{Point, lerp};
+use geom::Point;
 
 // TODO: sort out crate structure. Right now we want this when compiling raster as a binary,
 // but need it commented out when compiling showttf
@@ -115,7 +115,7 @@ impl Raster {
         let mut t = 0.0;
         for _i in 0 .. n - 1 {
             t += nrecip;
-            let pn = lerp(t, &lerp(t, p0, p1), &lerp(t, p1, p2));
+            let pn = Point::lerp(t, &Point::lerp(t, p0, p1), &Point::lerp(t, p1, p2));
             self.draw_line(&p, &pn);
             p = pn;
         }
