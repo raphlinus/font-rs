@@ -23,7 +23,6 @@ pub struct Point {
 }
 
 impl Point {
-    // could be more generic, use conversion trait
     pub fn new<T>(x: T, y: T) -> Point where T: Into<f32> { Point{ x: x.into(), y: y.into() } }
 }
 
