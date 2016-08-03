@@ -47,10 +47,6 @@ pub struct Affine {
 }
 
 impl Affine {
-    pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Affine {
-        Affine{a: a, b: b, c: c, d: d, e: e, f: f}
-    }
-
     /// Concatenate two affine transforms.
     pub fn concat(t1: &Affine, t2: &Affine) -> Affine {
         Affine {
@@ -67,3 +63,5 @@ impl Affine {
 pub fn affine_pt(z: &Affine, p: &Point) -> Point {
     Point{x: z.a * p.x + z.c * p.y + z.e, y: z.b * p.x + z.d * p.y + z.f}
 }
+
+gen_new!(Affine, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32);
