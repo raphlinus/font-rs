@@ -14,6 +14,8 @@
 
 //! A very high performance font renderer.
 
+#[macro_use]
+pub mod macros;
 pub mod geom;
 pub mod raster;
 pub mod font;
