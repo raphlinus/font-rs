@@ -22,7 +22,7 @@ use std::fmt;
 use std::fmt::{Formatter, Display};
 use std::result::Result;
 
-use geom::{Point, lerp, Affine, affine_pt};
+use geom::{Point, Affine, affine_pt};
 use raster::Raster;
 
 #[derive(PartialEq, Eq, Hash)]
@@ -536,7 +536,7 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
                         },
                         (Some(first_offcurve), Some(last_offcurve)) => {
                             self.last_offcurve = None;
-                            return Some(QuadTo(last_offcurve, lerp(0.5, &last_offcurve, &first_offcurve)))
+                            return Some(QuadTo(last_offcurve, Point::lerp(0.5, &last_offcurve, &first_offcurve)))
                         }
                     }
                 }
@@ -555,7 +555,7 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
                                 match self.first_offcurve {
                                     None => self.first_offcurve = Some(p),
                                     Some(first_offcurve) => {
-                                        let midp = lerp(0.5, &first_offcurve, &p);
+                                        let midp = Point::lerp(0.5, &first_offcurve, &p);
                                         self.first_oncurve = Some(midp);
                                         self.last_offcurve = Some(p);
                                         return Some(MoveTo(midp));
@@ -568,7 +568,7 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
                                 (None, true) => return Some(LineTo(p)),
                                 (Some(last_offcurve), false) => {
                                     self.last_offcurve = Some(p);
-                                    return Some(QuadTo(last_offcurve, lerp(0.5, &last_offcurve, &p)));
+                                    return Some(QuadTo(last_offcurve, Point::lerp(0.5, &last_offcurve, &p)));
                                 },
                                 (Some(last_offcurve), true) => {
                                     self.last_offcurve = None;
@@ -667,7 +667,7 @@ fn dump(data: Vec<u8>) {
 */
 
 fn draw_path<I: Iterator<Item=PathOp>>(r: &mut Raster, z: &Affine, path: &mut I) {
-    let mut lastp = Point::new(0, 0);
+    let mut lastp = Point::new(0i16, 0i16);
     for op in path {
         match op {
             MoveTo(p) => lastp = p,
