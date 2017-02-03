@@ -17,6 +17,12 @@
 #include <stdint.h>
 #include <tmmintrin.h>
 
+#ifdef _MSC_VER
+  #define M128CAST _mm_castsi128_ps
+#else
+  #define M128CAST __m128
+#endif
+
 void accumulate_sse(const float *in, uint8_t *out, uint32_t n) {
   __m128 offset = _mm_setzero_ps();
   __m128i mask = _mm_set1_epi32(0x0c080400);
@@ -31,7 +37,7 @@ void accumulate_sse(const float *in, uint8_t *out, uint32_t n) {
     y = _mm_mul_ps(y, _mm_set1_ps(255.0f));
     __m128i z = _mm_cvtps_epi32(y);
     z = _mm_shuffle_epi8(z, mask);
-    _mm_store_ss((float *)&out[i], (__m128)z);
+    _mm_store_ss((float *)&out[i], (M128CAST)(z));
     offset = _mm_shuffle_ps(x, x, _MM_SHUFFLE(3, 3, 3, 3));
   }
 }
