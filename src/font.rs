@@ -583,6 +583,7 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
     }
 }
 
+#[derive(Debug)]
 pub enum FontError {
     Invalid
 }
