@@ -31,7 +31,7 @@ void accumulate_sse(const float *in, uint8_t *out, uint32_t n) {
     y = _mm_mul_ps(y, _mm_set1_ps(255.0f));
     __m128i z = _mm_cvtps_epi32(y);
     z = _mm_shuffle_epi8(z, mask);
-    _mm_store_ss((float *)&out[i], (__m128)z);
+    _mm_store_ss((float *)&out[i], _mm_castsi128_ps(z));
     offset = _mm_shuffle_ps(x, x, _MM_SHUFFLE(3, 3, 3, 3));
   }
 }
