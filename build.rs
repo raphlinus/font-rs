@@ -1,7 +1,7 @@
 extern crate gcc;
 
 fn main() {
-    gcc::Config::new()
+    gcc::Build::new()
                 .file("src/accumulate.c")
                 .flag("-march=native")
                 .flag("-std=c99")

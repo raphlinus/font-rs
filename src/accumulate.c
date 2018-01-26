@@ -21,7 +21,7 @@ void accumulate_sse(const float *in, uint8_t *out, uint32_t n) {
   __m128 offset = _mm_setzero_ps();
   __m128i mask = _mm_set1_epi32(0x0c080400);
   __m128 sign_mask = _mm_set1_ps(-0.f);
-  for (int i = 0; i < n; i += 4) {
+  for (uint32_t i = 0; i < n; i += 4) {
     __m128 x = _mm_load_ps(&in[i]);
     x = _mm_add_ps(x, _mm_castsi128_ps(_mm_slli_si128(_mm_castps_si128(x), 4)));
     x = _mm_add_ps(x, _mm_shuffle_ps(_mm_setzero_ps(), x, 0x40));
