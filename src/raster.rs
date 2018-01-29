@@ -75,7 +75,7 @@ impl Raster {
                 self.a[linestart + x0i as usize] += d - d * xmf;
                 self.a[linestart + (x0i + 1) as usize] += d * xmf;
             } else {
-                let s = recip((x1 - x0));
+                let s = recip(x1 - x0);
                 let x0f = x0 - x0floor;
                 let a0 = 0.5 * s * (1.0 - x0f) * (1.0 - x0f);
                 let x1f = x1 - x1ceil + 1.0;
@@ -157,76 +157,4 @@ impl Raster {
             (255.0 * y) as u8
         }).collect()
     }
-}
-
-#[bench]
-fn empty200(b: &mut Bencher) {
-    b.iter(|| {
-        let w = 200;
-        let h = 200;
-        let r = Raster::new(w, h);
-        r.get_bitmap()
-    })
-}
-
-#[bench]
-fn render200(b: &mut Bencher) {
-    b.iter(|| {
-        let w = 200;
-        let h = 200;
-        let mut r = Raster::new(w, h);
-        draw_shape(&mut r, 1.0);
-        r.get_bitmap()
-    })
-}
-
-#[bench]
-fn prep200(b: &mut Bencher) {
-    b.iter(|| {
-        let w = 200;
-        let h = 200;
-        let mut r = Raster::new(w, h);
-        draw_shape(&mut r, 1.0);
-    })
-}
-
-#[bench]
-fn prep400(b: &mut Bencher) {
-    b.iter(|| {
-        let w = 400;
-        let h = 400;
-        let mut r = Raster::new(w, h);
-        draw_shape(&mut r, 2.0);
-    })
-}
-
-#[bench]
-fn render400(b: &mut Bencher) {
-    b.iter(|| {
-        let w = 400;
-        let h = 400;
-        let mut r = Raster::new(w, h);
-        draw_shape(&mut r, 2.0);
-        r.get_bitmap()
-    })
-}
-
-#[bench]
-fn empty400(b: &mut Bencher) {
-    b.iter(|| {
-        let w = 400;
-        let h = 400;
-        let r = Raster::new(w, h);
-        r.get_bitmap()
-    })
-}
-
-#[bench]
-fn alloc400(b: &mut Bencher) {
-    b.iter(|| Vec::from_elem(400 * 400 + 1, 0.0))
-}
-
-#[bench]
-fn alloc200(b: &mut Bencher) {
-    b.iter(|| Vec::from_elem(200 * 200 + 1, 0.0))
 }
