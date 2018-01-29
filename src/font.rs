@@ -14,9 +14,6 @@
 
 //! A simple renderer for TrueType fonts
 
-//extern crate test;
-//use self::test::Bencher;
-
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Formatter, Display};
@@ -691,46 +688,3 @@ pub struct GlyphBitmap {
     pub top: i32,
     pub data: Vec<u8>,
 }
-
-/*
-TODO: get these benchmarks to work
-
-fn glyphbench(b: &mut Bencher, size: u32) {
-    let filename = "/Users/raph/Downloads/wt024.ttf";
-    let mut f = File::open(filename).unwrap();
-    let mut data = Vec::new();
-    match f.read_to_end(&mut data) {
-        Ok(_) => match parse(&data) {
-            Ok(font) =>
-                b.iter(|| render_glyph(&font, 6000, size)),
-            _ => ()
-        },
-        _ => ()
-    }
-}
-
-#[bench]
-fn glyph400(b: &mut Bencher) {
-    glyphbench(b, 400)
-}
-
-#[bench]
-fn glyph100(b: &mut Bencher) {
-    glyphbench(b, 100)
-}
-
-#[bench]
-fn glyph040(b: &mut Bencher) {
-    glyphbench(b, 40)
-}
-
-#[bench]
-fn glyph020(b: &mut Bencher) {
-    glyphbench(b, 20)
-}
-
-#[bench]
-fn glyph010(b: &mut Bencher) {
-    glyphbench(b, 10)
-}
-*/
