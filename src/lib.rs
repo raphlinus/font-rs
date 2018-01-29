@@ -16,6 +16,7 @@
 
 #[macro_use]
 pub mod macros;
+pub mod accumulate;
 pub mod font;
 pub mod geom;
 pub mod raster;
