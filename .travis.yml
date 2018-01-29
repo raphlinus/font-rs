@@ -1,0 +1,22 @@
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+cache:
+  - apt
+  - cargo
+
+os:
+  - linux
+
+script:
+  - cargo build --verbose --features ""
+  - cargo test --verbose --features ""
+  - cargo build --verbose --features sse
+  - cargo test --verbose --features sse
+  - |
+    if [[ "$TRAVIS_RUST_VERSION" == "nightly" ]]; then
+      cargo bench --features ""
+      cargo bench --features "sse"
+    fi
