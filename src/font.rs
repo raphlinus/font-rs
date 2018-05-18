@@ -189,7 +189,8 @@ impl<'a> Encoding<'a> {
         let &Encoding(data) = self;
         let mut result = vec![];
         let mut vec_position = start_position;
-        for index in 0..count {
+        let limit = vec_position + 2 * count;
+        while vec_position < limit {
             result.push(get_u16(data, vec_position as usize).unwrap());
             vec_position += 2;
         }
@@ -200,7 +201,8 @@ impl<'a> Encoding<'a> {
         let &Encoding(data) = self;
         let mut result = vec![];
         let mut vec_position = start_position;
-        for index in 0..count {
+        let limit = vec_position + 2 * count;
+        while vec_position < limit {
             result.push(get_i16(data, vec_position as usize).unwrap());
             vec_position += 2;
         }
@@ -280,7 +282,6 @@ impl<'a> Encoding<'a> {
                         let glyph_index = glyph_array_value as i16 + id_delta;
                         Some(glyph_index as u16)
                     };
-                    return None;
                 }
             } else {
                 size /= 2;
@@ -333,11 +334,8 @@ impl<'a> Cmap<'a> {
     }
 
     fn get_encoding_records(&'a self) -> Vec<EncodingRecord> {
-        let &Cmap(data) = self;
         let mut encodings = vec![];
         for i in 0..self.get_num_tables() {
-            let enc_offset = (i * 8 + 4) as usize;
-            let encoding_data = &data[enc_offset as usize..(enc_offset + 12) as usize];
             encodings.push(self.get_encoding_record(i).unwrap());
         }
         encodings
@@ -356,7 +354,6 @@ impl<'a> Cmap<'a> {
     }
 
     fn get_encodings(&'a self) -> Vec<Encoding> {
-        let &Cmap(data) = self;
         let mut encodings = vec![];
         for i in 0..self.get_num_tables() {
             encodings.push(self.get_encoding(i).unwrap());
@@ -946,7 +943,7 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
         cmap: cmap,
         glyf: glyf,
     };
-    //println!("cmap = {:#?}", f.cmap.as_ref().unwrap());
+    println!("cmap = {:#?}", f.cmap.as_ref().unwrap());
     //println!("version = {:x}", version);
     Ok(f)
 }
