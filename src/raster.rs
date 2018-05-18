@@ -25,12 +25,12 @@ use geom::Point;
 pub struct Raster {
     w: usize,
     h: usize,
-    a: Vec<f32>
+    a: Vec<f32>,
 }
 
-#[cfg(feature="sse")]
+#[cfg(feature = "sse")]
 #[link(name = "accumulate")]
-extern {
+extern "C" {
     fn accumulate_sse(src: *const f32, dst: *mut u8, n: u32);
 }
 
@@ -41,13 +41,17 @@ fn recip(x: f32) -> f32 {
 
 impl Raster {
     pub fn new(w: usize, h: usize) -> Raster {
-        Raster{ w: w, h: h, a: vec!(0.0; w * h + 4) }
+        Raster {
+            w: w,
+            h: h,
+            a: vec![0.0; w * h + 4],
+        }
     }
 
     pub fn draw_line(&mut self, p0: &Point, p1: &Point) {
         //println!("draw_line {} {}", p0, p1);
         if p0.y == p1.y {
-            return
+            return;
         }
         let (dir, p0, p1) = if p0.y < p1.y {
             (1.0, p0, p1)
@@ -56,7 +60,7 @@ impl Raster {
         };
         let dxdy = (p1.x - p0.x) / (p1.y - p0.y);
         let mut x = p0.x;
-        let y0 = p0.y as usize;  // note: implicit max of 0 because usize (TODO: really true?)
+        let y0 = p0.y as usize; // note: implicit max of 0 because usize (TODO: really true?)
         if p0.y < 0.0 {
             x -= p0.y * dxdy;
         }
@@ -86,7 +90,7 @@ impl Raster {
                 } else {
                     let a1 = s * (1.5 - x0f);
                     self.a[linestart + (x0i + 1) as usize] += d * (a1 - a0);
-                    for xi in x0i + 2 .. x1i - 1 {
+                    for xi in x0i + 2..x1i - 1 {
                         self.a[linestart + xi as usize] += d * s;
                     }
                     let a2 = a1 + (x1i - x0i - 3) as f32 * s;
@@ -105,7 +109,7 @@ impl Raster {
         let devsq = devx * devx + devy * devy;
         if devsq < 0.333 {
             self.draw_line(p0, p2);
-            return
+            return;
         }
         let tol = 3.0;
         let n = 1 + (tol * (devx * devx + devy * devy)).sqrt().sqrt().floor() as usize;
@@ -113,7 +117,7 @@ impl Raster {
         let mut p = *p0;
         let nrecip = recip(n as f32);
         let mut t = 0.0;
-        for _i in 0 .. n - 1 {
+        for _i in 0..n - 1 {
             t += nrecip;
             let pn = Point::lerp(t, &Point::lerp(t, p0, p1), &Point::lerp(t, p1, p2));
             self.draw_line(&p, &pn);
@@ -122,7 +126,7 @@ impl Raster {
         self.draw_line(&p, p2);
     }
 
-/*
+    /*
     fn get_bitmap_fancy(&self) -> Vec<u8> {
         let mut acc = 0.0;
         // This would translate really well to SIMD
@@ -134,7 +138,7 @@ impl Raster {
     }
 */
 
-    #[cfg(feature="sse")]
+    #[cfg(feature = "sse")]
     pub fn get_bitmap(&self) -> Vec<u8> {
         let dst_size = self.w * self.h;
         let dst_cap = (dst_size + 3) & !3;
@@ -146,15 +150,17 @@ impl Raster {
         r
     }
 
-    #[cfg(not(feature="sse"))]
+    #[cfg(not(feature = "sse"))]
     pub fn get_bitmap(&self) -> Vec<u8> {
         let mut acc = 0.0;
-        (0..self.w * self.h).map(|i| {
-        // This would translate really well to SIMD
-            acc += self.a[i];
-            let y = acc.abs();
-            let y = if y < 1.0 { y } else { 1.0 };
-            (255.0 * y) as u8
-        }).collect()
+        (0..self.w * self.h)
+            .map(|i| {
+                // This would translate really well to SIMD
+                acc += self.a[i];
+                let y = acc.abs();
+                let y = if y < 1.0 { y } else { 1.0 };
+                (255.0 * y) as u8
+            })
+            .collect()
     }
 }

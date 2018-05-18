@@ -19,10 +19,10 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::fmt::{Formatter, Display};
+use std::fmt::{Display, Formatter};
 use std::result::Result;
 
-use geom::{Point, Affine, affine_pt};
+use geom::{affine_pt, Affine, Point};
 use raster::Raster;
 
 #[derive(PartialEq, Eq, Hash)]
@@ -37,10 +37,12 @@ impl Tag {
 impl Display for Tag {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let &Tag(tag) = self;
-        let buf = vec![((tag >> 24) & 0xff) as u8,
-                ((tag >> 16) & 0xff) as u8,
-                ((tag >> 8) & 0xff) as u8,
-                (tag & 0xff) as u8];
+        let buf = vec![
+            ((tag >> 24) & 0xff) as u8,
+            ((tag >> 16) & 0xff) as u8,
+            ((tag >> 8) & 0xff) as u8,
+            (tag & 0xff) as u8,
+        ];
         f.write_str(&String::from_utf8(buf).unwrap())
     }
 }
@@ -65,8 +67,12 @@ fn get_u32(data: &[u8], off: usize) -> Option<u32> {
     if off + 3 > data.len() {
         None
     } else {
-        Some(((data[off] as u32) << 24) | ((data[off + 1] as u32) << 16) |
-            ((data[off + 2] as u32) << 8) | data[off + 3] as u32)
+        Some(
+            ((data[off] as u32) << 24)
+                | ((data[off + 1] as u32) << 16)
+                | ((data[off + 2] as u32) << 8)
+                | data[off + 3] as u32,
+        )
     }
 }
 
@@ -86,7 +92,7 @@ impl<'a> Head<'a> {
 }
 
 struct Maxp<'a> {
-    data: &'a [u8]
+    data: &'a [u8],
 }
 
 impl<'a> Maxp<'a> {
@@ -109,10 +115,11 @@ impl<'a> Loca<'a> {
 }
 
 fn get_bbox_raw(data: &[u8]) -> (i16, i16, i16, i16) {
-    (get_i16(data, 2).unwrap(),
-     get_i16(data, 4).unwrap(),
-     get_i16(data, 6).unwrap(),
-     get_i16(data, 8).unwrap(),
+    (
+        get_i16(data, 2).unwrap(),
+        get_i16(data, 4).unwrap(),
+        get_i16(data, 6).unwrap(),
+        get_i16(data, 8).unwrap(),
     )
 }
 
@@ -123,7 +130,7 @@ enum Glyph<'a> {
 }
 
 struct SimpleGlyph<'a> {
-    data: &'a [u8]
+    data: &'a [u8],
 }
 
 impl<'a> SimpleGlyph<'a> {
@@ -140,7 +147,7 @@ impl<'a> SimpleGlyph<'a> {
         let n_contours = self.number_of_contours();
         let insn_len_off = 10 + 2 * n_contours as usize;
         let n_points = get_u16(data, insn_len_off - 2).unwrap() as usize + 1;
-        let insn_len = get_u16(data, insn_len_off).unwrap();  // insn_len
+        let insn_len = get_u16(data, insn_len_off).unwrap(); // insn_len
         let flags_ix = insn_len_off + insn_len as usize + 2;
         let mut flags_size = 0;
         let mut x_size = 0;
@@ -157,15 +164,23 @@ impl<'a> SimpleGlyph<'a> {
             match flag & 0x12 {
                 0x02 | 0x12 => x_size += repeat_count,
                 0x00 => x_size += 2 * repeat_count,
-                _ => ()
+                _ => (),
             }
             points_remaining -= repeat_count;
         }
         let x_ix = flags_ix + flags_size;
         let y_ix = x_ix + x_size;
-        GlyphPoints{data: data, x: 0, y: 0, points_remaining: n_points,
-            last_flag:0, flag_repeats_remaining: 0,
-            flags_ix: flags_ix, x_ix: x_ix, y_ix: y_ix }
+        GlyphPoints {
+            data: data,
+            x: 0,
+            y: 0,
+            points_remaining: n_points,
+            last_flag: 0,
+            flag_repeats_remaining: 0,
+            flags_ix: flags_ix,
+            x_ix: x_ix,
+            y_ix: y_ix,
+        }
     }
 
     fn contour_sizes(&self) -> ContourSizes {
@@ -210,12 +225,13 @@ impl<'a> Iterator for GlyphPoints<'a> {
             }
             let flag = self.last_flag;
             //println!("flag={:02x}, flags_ix={}, x_ix={}, ({}) y_ix={} ({})",
-            //  flag, self.flags_ix, self.x_ix, self.data.get(self.x_ix), self.y_ix, self.data.get(self.y_ix));
+            // flag, self.flags_ix, self.x_ix, self.data.get(self.x_ix), self.y_ix,
+            // self.data.get(self.y_ix));
             match flag & 0x12 {
                 0x02 => {
                     self.x -= self.data[self.x_ix] as i16;
                     self.x_ix += 1;
-                },
+                }
                 0x00 => {
                     self.x += get_i16(self.data, self.x_ix).unwrap();
                     self.x_ix += 2;
@@ -223,14 +239,14 @@ impl<'a> Iterator for GlyphPoints<'a> {
                 0x12 => {
                     self.x += self.data[self.x_ix] as i16;
                     self.x_ix += 1;
-                },
-                _ => ()
+                }
+                _ => (),
             }
             match flag & 0x24 {
                 0x04 => {
                     self.y -= self.data[self.y_ix] as i16;
                     self.y_ix += 1;
-                },
+                }
                 0x00 => {
                     self.y += get_i16(self.data, self.y_ix).unwrap();
                     self.y_ix += 2;
@@ -238,8 +254,8 @@ impl<'a> Iterator for GlyphPoints<'a> {
                 0x24 => {
                     self.y += self.data[self.y_ix] as i16;
                     self.y_ix += 1;
-                },
-                _ => ()
+                }
+                _ => (),
             }
             self.points_remaining -= 1;
             Some(((self.last_flag & 1) != 0, self.x, self.y))
@@ -247,7 +263,10 @@ impl<'a> Iterator for GlyphPoints<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.points_remaining as usize, Some(self.points_remaining as usize))
+        (
+            self.points_remaining as usize,
+            Some(self.points_remaining as usize),
+        )
     }
 }
 
@@ -278,7 +297,7 @@ impl<'a> Iterator for ContourSizes<'a> {
 }
 
 struct CompoundGlyph<'a> {
-    data: &'a [u8]
+    data: &'a [u8],
 }
 
 struct Components<'a> {
@@ -296,7 +315,9 @@ const WE_HAVE_A_TWO_BY_TWO: u16 = 1 << 7;
 impl<'a> Iterator for Components<'a> {
     type Item = (u16, Affine);
     fn next(&mut self) -> Option<(u16, Affine)> {
-        if !self.more { return None; }
+        if !self.more {
+            return None;
+        }
         let flags = get_u16(self.data, self.ix).unwrap();
         self.ix += 2;
         let glyph_index = get_u16(self.data, self.ix).unwrap();
@@ -369,7 +390,6 @@ pub struct Font<'a> {
     glyf: Option<&'a [u8]>,
 }
 
-
 struct Metrics {
     l: i32,
     t: i32,
@@ -388,15 +408,21 @@ impl Metrics {
 }
 
 impl<'a> Font<'a> {
-    fn metrics_and_affine(&self, xmin: i16, ymin: i16, xmax: i16, ymax: i16, size:u32) ->
-            (Metrics, Affine) {
+    fn metrics_and_affine(
+        &self, xmin: i16, ymin: i16, xmax: i16, ymax: i16, size: u32,
+    ) -> (Metrics, Affine) {
         let ppem = self.head.units_per_em();
         let scale = (size as f32) / (ppem as f32);
         let l = (xmin as f32 * scale).floor() as i32;
         let t = (ymax as f32 * -scale).floor() as i32;
         let r = (xmax as f32 * scale).ceil() as i32;
         let b = (ymin as f32 * -scale).ceil() as i32;
-        let metrics = Metrics { l: l, t: t, r: r, b: b };
+        let metrics = Metrics {
+            l: l,
+            t: t,
+            r: r,
+            b: b,
+        };
         let z = Affine::new(scale, 0.0, 0.0, -scale, -l as f32, -t as f32);
         (metrics, z)
     }
@@ -442,9 +468,9 @@ impl<'a> Font<'a> {
                     height: metrics.height(),
                     left: metrics.l,
                     top: metrics.t,
-                    data: raster.get_bitmap()
+                    data: raster.get_bitmap(),
                 })
-            },
+            }
             Some(Glyph::Compound(ref c)) => {
                 let (xmin, ymin, xmax, ymax) = c.bbox();
                 let (metrics, z) = self.metrics_and_affine(xmin, ymin, xmax, ymax, size);
@@ -455,7 +481,7 @@ impl<'a> Font<'a> {
                     height: metrics.height(),
                     left: metrics.l,
                     top: metrics.t,
-                    data: raster.get_bitmap()
+                    data: raster.get_bitmap(),
                 })
             }
             _ => {
@@ -466,24 +492,29 @@ impl<'a> Font<'a> {
     }
 
     fn get_glyph(&self, glyph_ix: u16) -> Option<Glyph> {
-        if glyph_ix >= self.maxp.num_glyphs() { return None }
+        if glyph_ix >= self.maxp.num_glyphs() {
+            return None;
+        }
         let fmt = self.head.index_to_loc_format();
         match self.loca {
-            Some(ref loca) => match (loca.get_off(glyph_ix, fmt), loca.get_off(glyph_ix + 1, fmt), self.glyf) {
-                (Some(off0), Some(off1), Some(glyf)) =>
-                    if off0 == off1 {
-                        Some(Glyph::Empty)
+            Some(ref loca) => match (
+                loca.get_off(glyph_ix, fmt),
+                loca.get_off(glyph_ix + 1, fmt),
+                self.glyf,
+            ) {
+                (Some(off0), Some(off1), Some(glyf)) => if off0 == off1 {
+                    Some(Glyph::Empty)
+                } else {
+                    let glyph_data = &glyf[off0 as usize..off1 as usize];
+                    if get_i16(glyph_data, 0) == Some(-1) {
+                        Some(Glyph::Compound(CompoundGlyph { data: glyph_data }))
                     } else {
-                        let glyph_data = &glyf[off0 as usize .. off1 as usize];
-                        if get_i16(glyph_data, 0) == Some(-1) {
-                            Some(Glyph::Compound(CompoundGlyph{data: glyph_data}))
-                        } else {
-                            Some(Glyph::Simple(SimpleGlyph{data: glyph_data}))
-                        }
-                    },
-                (_, _, _) => None
+                        Some(Glyph::Simple(SimpleGlyph { data: glyph_data }))
+                    }
+                },
+                (_, _, _) => None,
             },
-            None => None
+            None => None,
         }
     }
 }
@@ -495,7 +526,7 @@ enum PathOp {
     QuadTo(Point, Point),
 }
 
-use self::PathOp::{MoveTo, LineTo, QuadTo};
+use self::PathOp::{LineTo, MoveTo, QuadTo};
 
 struct BezPathOps<T> {
     inner: T,
@@ -507,36 +538,46 @@ struct BezPathOps<T> {
 }
 
 fn path_from_pts<T: Iterator>(inner: T) -> BezPathOps<T> {
-    BezPathOps{
-        inner: inner, first_oncurve: None, first_offcurve: None, last_offcurve: None,
-        alldone: false, closing: false
+    BezPathOps {
+        inner: inner,
+        first_oncurve: None,
+        first_offcurve: None,
+        last_offcurve: None,
+        alldone: false,
+        closing: false,
     }
 }
 
-impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
+impl<I> Iterator for BezPathOps<I>
+where
+    I: Iterator<Item = (bool, i16, i16)>,
+{
     type Item = PathOp;
     fn next(&mut self) -> Option<PathOp> {
         loop {
             if self.closing {
                 if self.alldone {
-                    return None
+                    return None;
                 } else {
                     match (self.first_offcurve, self.last_offcurve) {
                         (None, None) => {
                             self.alldone = true;
-                            return Some(LineTo(self.first_oncurve.unwrap()))
-                        },
+                            return Some(LineTo(self.first_oncurve.unwrap()));
+                        }
                         (None, Some(last_offcurve)) => {
                             self.alldone = true;
-                            return Some(QuadTo(last_offcurve, self.first_oncurve.unwrap()))
-                        },
+                            return Some(QuadTo(last_offcurve, self.first_oncurve.unwrap()));
+                        }
                         (Some(first_offcurve), None) => {
                             self.alldone = true;
-                            return Some(QuadTo(first_offcurve, self.first_oncurve.unwrap()))
-                        },
+                            return Some(QuadTo(first_offcurve, self.first_oncurve.unwrap()));
+                        }
                         (Some(first_offcurve), Some(last_offcurve)) => {
                             self.last_offcurve = None;
-                            return Some(QuadTo(last_offcurve, Point::lerp(0.5, &last_offcurve, &first_offcurve)))
+                            return Some(QuadTo(
+                                last_offcurve,
+                                Point::lerp(0.5, &last_offcurve, &first_offcurve),
+                            ));
                         }
                     }
                 }
@@ -544,7 +585,7 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
                 match self.inner.next() {
                     None => {
                         self.closing = true;
-                    },
+                    }
                     Some((oncurve, x, y)) => {
                         let p = Point::new(x, y);
                         if self.first_oncurve.is_none() {
@@ -568,8 +609,11 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
                                 (None, true) => return Some(LineTo(p)),
                                 (Some(last_offcurve), false) => {
                                     self.last_offcurve = Some(p);
-                                    return Some(QuadTo(last_offcurve, Point::lerp(0.5, &last_offcurve, &p)));
-                                },
+                                    return Some(QuadTo(
+                                        last_offcurve,
+                                        Point::lerp(0.5, &last_offcurve, &p),
+                                    ));
+                                }
                                 (Some(last_offcurve), true) => {
                                     self.last_offcurve = None;
                                     return Some(QuadTo(last_offcurve, p));
@@ -585,7 +629,7 @@ impl<I> Iterator for BezPathOps<I> where I: Iterator<Item=(bool, i16, i16)> {
 
 #[derive(Debug)]
 pub enum FontError {
-    Invalid
+    Invalid,
 }
 
 pub fn parse(data: &[u8]) -> Result<Font, FontError> {
@@ -599,20 +643,23 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     let _range_shift = get_u16(data, 10).unwrap();
     let mut tables = HashMap::new();
     for i in 0..num_tables {
-        let header = &data[12 + i*16 .. 12 + (i + 1) * 16];
+        let header = &data[12 + i * 16..12 + (i + 1) * 16];
         let tag = get_u32(header, 0).unwrap();
         let _check_sum = get_u32(header, 4).unwrap();
         let offset = get_u32(header, 8).unwrap();
         let length = get_u32(header, 12).unwrap();
-        let table_data = &data[offset as usize .. (offset + length) as usize];
+        let table_data = &data[offset as usize..(offset + length) as usize];
         //println!("{}: {}", Tag(tag), tableData.len())
         tables.insert(Tag(tag), table_data);
     }
     let head = Head(*tables.get(&Tag::from_str("head")).unwrap()); // todo: don't fail
-    let maxp = Maxp{data: *tables.get(&Tag::from_str("maxp")).unwrap()};
+    let maxp = Maxp {
+        data: *tables.get(&Tag::from_str("maxp")).unwrap(),
+    };
     let loca = tables.get(&Tag::from_str("loca")).map(|&data| Loca(data));
     let glyf = tables.get(&Tag::from_str("glyf")).map(|&data| data);
-    let f = Font{_version: version,
+    let f = Font {
+        _version: version,
         _tables: tables,
         head: head,
         maxp: maxp,
@@ -667,7 +714,7 @@ fn dump(data: Vec<u8>) {
 }
 */
 
-fn draw_path<I: Iterator<Item=PathOp>>(r: &mut Raster, z: &Affine, path: &mut I) {
+fn draw_path<I: Iterator<Item = PathOp>>(r: &mut Raster, z: &Affine, path: &mut I) {
     let mut lastp = Point::new(0i16, 0i16);
     for op in path {
         match op {
@@ -675,9 +722,13 @@ fn draw_path<I: Iterator<Item=PathOp>>(r: &mut Raster, z: &Affine, path: &mut I)
             LineTo(p) => {
                 r.draw_line(&affine_pt(z, &lastp), &affine_pt(z, &p));
                 lastp = p
-            },
+            }
             QuadTo(p1, p2) => {
-                r.draw_quad(&affine_pt(z, &lastp), &affine_pt(z, &p1), &affine_pt(z, &p2));
+                r.draw_quad(
+                    &affine_pt(z, &lastp),
+                    &affine_pt(z, &p1),
+                    &affine_pt(z, &p2),
+                );
                 lastp = p2;
             }
         }

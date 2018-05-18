@@ -18,13 +18,44 @@ extern crate font_rs;
 
 use std::io::{stdout, Write};
 
-use font_rs::raster::Raster;
 use font_rs::geom::Point;
+use font_rs::raster::Raster;
 
 fn draw_shape(r: &mut Raster, s: f32) {
-    r.draw_line(&Point{x:s*10.0, y:s*10.5}, &Point{x: s*20.0, y: s*150.0});
-    r.draw_line(&Point{x:s*20.0, y:s*150.0}, &Point{x: s*50.0, y: s*139.0});
-    r.draw_quad(&Point{x:s*50.0, y:s*139.0}, &Point{x: s*100.0, y: s*60.0}, &Point{x: s*10.0, y: s*10.5});
+    r.draw_line(
+        &Point {
+            x: s * 10.0,
+            y: s * 10.5,
+        },
+        &Point {
+            x: s * 20.0,
+            y: s * 150.0,
+        },
+    );
+    r.draw_line(
+        &Point {
+            x: s * 20.0,
+            y: s * 150.0,
+        },
+        &Point {
+            x: s * 50.0,
+            y: s * 139.0,
+        },
+    );
+    r.draw_quad(
+        &Point {
+            x: s * 50.0,
+            y: s * 139.0,
+        },
+        &Point {
+            x: s * 100.0,
+            y: s * 60.0,
+        },
+        &Point {
+            x: s * 10.0,
+            y: s * 10.5,
+        },
+    );
 }
 
 fn main() {

@@ -46,22 +46,22 @@ fn main() {
                         for _ in 0..n_iter {
                             match font.render_glyph(glyph_id, size) {
                                 Some(_glyph) => (),
-                                None => ()
+                                None => (),
                             }
                         }
                         let elapsed = start.elapsed().unwrap();
-                        let elapsed = elapsed.as_secs() as f64 + 1e-9 * (elapsed.subsec_nanos() as f64);
+                        let elapsed =
+                            elapsed.as_secs() as f64 + 1e-9 * (elapsed.subsec_nanos() as f64);
                         println!("{} {}", size, elapsed * (1e6 / n_iter as f64));
                     }
                 } else {
                     match font.render_glyph(glyph_id, 400) {
                         Some(glyph) => dump_pgm(&glyph, &out_filename),
-                        None => println!("failed to render {} {}", filename, glyph_id)
+                        None => println!("failed to render {} {}", filename, glyph_id),
                     }
                 }
-            },
-            Err(_) => println!("failed to parse {}", filename)
-        }
+            }
+            Err(_) => println!("failed to parse {}", filename),
+        },
     }
-
 }
