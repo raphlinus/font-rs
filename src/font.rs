@@ -943,7 +943,6 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
         cmap: cmap,
         glyf: glyf,
     };
-    println!("cmap = {:#?}", f.cmap.as_ref().unwrap());
     //println!("version = {:x}", version);
     Ok(f)
 }
