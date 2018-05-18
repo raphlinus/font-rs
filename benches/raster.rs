@@ -22,38 +22,17 @@ use test::Bencher;
 
 fn draw_shape(r: &mut Raster, s: f32) {
     r.draw_line(
-        &Point {
-            x: s * 10.0,
-            y: s * 10.5,
-        },
-        &Point {
-            x: s * 20.0,
-            y: s * 150.0,
-        },
+        &Point::new(s * 10.0, s * 10.5),
+        &Point::new(s * 20.0, s * 150.0),
     );
     r.draw_line(
-        &Point {
-            x: s * 20.0,
-            y: s * 150.0,
-        },
-        &Point {
-            x: s * 50.0,
-            y: s * 139.0,
-        },
+        &Point::new(s * 20.0, s * 150.0),
+        &Point::new(s * 50.0, s * 139.0),
     );
     r.draw_quad(
-        &Point {
-            x: s * 50.0,
-            y: s * 139.0,
-        },
-        &Point {
-            x: s * 100.0,
-            y: s * 60.0,
-        },
-        &Point {
-            x: s * 10.0,
-            y: s * 10.5,
-        },
+        &Point::new(s * 50.0, s * 139.0),
+        &Point::new(s * 100.0, s * 60.0),
+        &Point::new(s * 10.0, s * 10.5),
     );
 }
 
