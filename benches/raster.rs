@@ -13,17 +13,27 @@
 // limitations under the License.
 
 #![feature(test)]
-extern crate test;
 extern crate font_rs;
+extern crate test;
 
-use test::Bencher;
-use font_rs::raster::*;
 use font_rs::geom::Point;
+use font_rs::raster::*;
+use test::Bencher;
 
 fn draw_shape(r: &mut Raster, s: f32) {
-    r.draw_line(&Point{x:s*10.0, y:s*10.5}, &Point{x: s*20.0, y: s*150.0});
-    r.draw_line(&Point{x:s*20.0, y:s*150.0}, &Point{x: s*50.0, y: s*139.0});
-    r.draw_quad(&Point{x:s*50.0, y:s*139.0}, &Point{x: s*100.0, y: s*60.0}, &Point{x: s*10.0, y: s*10.5});
+    r.draw_line(
+        &Point::new(s * 10.0, s * 10.5),
+        &Point::new(s * 20.0, s * 150.0),
+    );
+    r.draw_line(
+        &Point::new(s * 20.0, s * 150.0),
+        &Point::new(s * 50.0, s * 139.0),
+    );
+    r.draw_quad(
+        &Point::new(s * 50.0, s * 139.0),
+        &Point::new(s * 100.0, s * 60.0),
+        &Point::new(s * 10.0, s * 10.5),
+    );
 }
 
 #[bench]

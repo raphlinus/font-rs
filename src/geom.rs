@@ -14,7 +14,7 @@
 
 //! Geometry primitive data structures and manipulations
 
-use std::fmt::{Formatter, Result, Debug};
+use std::fmt::{Debug, Formatter, Result};
 
 #[derive(Copy, Clone)]
 pub struct Point {
@@ -23,10 +23,21 @@ pub struct Point {
 }
 
 impl Point {
-    pub fn new<T>(x: T, y: T) -> Point where T: Into<f32> { Point{ x: x.into(), y: y.into() } }
+    pub fn new<T>(x: T, y: T) -> Point
+    where
+        T: Into<f32>,
+    {
+        Point {
+            x: x.into(),
+            y: y.into(),
+        }
+    }
 
     pub fn lerp(t: f32, p0: &Self, p1: &Self) -> Self {
-        Point { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) }
+        Point {
+            x: p0.x + t * (p1.x - p0.x),
+            y: p0.y + t * (p1.y - p0.y),
+        }
     }
 }
 
@@ -61,7 +72,10 @@ impl Affine {
 }
 
 pub fn affine_pt(z: &Affine, p: &Point) -> Point {
-    Point{x: z.a * p.x + z.c * p.y + z.e, y: z.b * p.x + z.d * p.y + z.f}
+    Point {
+        x: z.a * p.x + z.c * p.y + z.e,
+        y: z.b * p.x + z.d * p.y + z.f,
+    }
 }
 
 gen_new!(Affine, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32);
