@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #![feature(test)]
-extern crate test;
 extern crate font_rs;
+extern crate test;
 
-use test::Bencher;
 use font_rs::font;
+use test::Bencher;
 
 use std::fs::File;
 use std::io::Read;
