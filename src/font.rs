@@ -81,13 +81,11 @@ struct Head<'a>(&'a [u8]);
 
 impl<'a> Head<'a> {
     fn index_to_loc_format(&'a self) -> i16 {
-        let &Head(data) = self;
-        get_i16(data, 50).unwrap()
+        get_i16(self.0, 50).unwrap()
     }
 
     fn units_per_em(&'a self) -> u16 {
-        let &Head(data) = self;
-        get_u16(data, 18).unwrap()
+        get_u16(self.0, 18).unwrap()
     }
 }
 
@@ -105,11 +103,10 @@ struct Loca<'a>(&'a [u8]);
 
 impl<'a> Loca<'a> {
     fn get_off(&'a self, glyph_ix: u16, fmt: i16) -> Option<u32> {
-        let &Loca(data) = self;
         if fmt != 0 {
-            get_u32(data, glyph_ix as usize * 4)
+            get_u32(self.0, glyph_ix as usize * 4)
         } else {
-            get_u16(data, glyph_ix as usize * 2).map(|raw| raw as u32 * 2)
+            get_u16(self.0, glyph_ix as usize * 2).map(|raw| raw as u32 * 2)
         }
     }
 }
@@ -118,18 +115,15 @@ struct EncodingRecord<'a>(&'a [u8]);
 
 impl<'a> EncodingRecord<'a> {
     fn get_platform_id(&'a self) -> u16 {
-        let &EncodingRecord(data) = self;
-        get_u16(data, 0).unwrap()
+        get_u16(self.0, 0).unwrap()
     }
 
     fn get_encoding_id(&'a self) -> u16 {
-        let &EncodingRecord(data) = self;
-        get_u16(data, 2).unwrap()
+        get_u16(self.0, 2).unwrap()
     }
 
     fn get_offset(&'a self) -> u32 {
-        let &EncodingRecord(data) = self;
-        get_u32(data, 4).unwrap()
+        get_u32(self.0, 4).unwrap()
     }
 }
 
@@ -147,23 +141,19 @@ struct Encoding<'a>(&'a [u8]);
 
 impl<'a> Encoding<'a> {
     fn get_format(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 0).unwrap()
+        get_u16(self.0, 0).unwrap()
     }
 
     fn get_length(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 2).unwrap()
+        get_u16(self.0, 2).unwrap()
     }
 
     fn get_language(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 4).unwrap()
+        get_u16(self.0, 4).unwrap()
     }
 
     fn get_seg_count_x_2(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 6).unwrap()
+        get_u16(self.0, 6).unwrap()
     }
 
     fn get_seg_count(&'a self) -> u16 {
@@ -171,39 +161,34 @@ impl<'a> Encoding<'a> {
     }
 
     fn get_search_range(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 8).unwrap()
+        get_u16(self.0, 8).unwrap()
     }
 
     fn get_entry_selector(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 10).unwrap()
+        get_u16(self.0, 10).unwrap()
     }
 
     fn get_range_shift(&'a self) -> u16 {
-        let &Encoding(data) = self;
-        get_u16(data, 12).unwrap()
+        get_u16(self.0, 12).unwrap()
     }
 
     fn get_u16_vec(&'a self, start_position: u16, count: u16) -> Vec<u16> {
-        let &Encoding(data) = self;
         let mut result = vec![];
         let mut vec_position = start_position;
         let limit = vec_position + 2 * count;
         while vec_position < limit {
-            result.push(get_u16(data, vec_position as usize).unwrap());
+            result.push(get_u16(self.0, vec_position as usize).unwrap());
             vec_position += 2;
         }
         result
     }
 
     fn get_i16_vec(&'a self, start_position: u16, count: u16) -> Vec<i16> {
-        let &Encoding(data) = self;
         let mut result = vec![];
         let mut vec_position = start_position;
         let limit = vec_position + 2 * count;
         while vec_position < limit {
-            result.push(get_i16(data, vec_position as usize).unwrap());
+            result.push(get_i16(self.0, vec_position as usize).unwrap());
             vec_position += 2;
         }
         result
@@ -245,6 +230,29 @@ impl<'a> Encoding<'a> {
         self.get_u16_vec(Self::get_id_range_offset_position(seg_count), seg_count)
     }
 
+    fn extract_glyph_id(
+        &'a self, code_point: u16, start_value: u16, seg_count: u16, seg_index: u16,
+    ) -> Option<u16> {
+        let data = &self.0;
+        let seg_index_pos = 2 * seg_index;
+        let id_range_offset_pos = Self::get_id_range_offset_position(seg_count) + seg_index_pos;
+        let id_range_offset_value = get_u16(data, id_range_offset_pos as usize).unwrap();
+        let id_delta_pos = Self::get_id_deltas_position(seg_count) + seg_index_pos;
+        let id_delta = get_i16(data, id_delta_pos as usize).unwrap();
+        if id_range_offset_value == 0 {
+            Some((code_point as i16 + id_delta) as u16)
+        } else {
+            let delta = (code_point - start_value) * 2;
+            let pos = id_range_offset_pos.wrapping_add(delta) + id_range_offset_value;
+            let glyph_array_value = get_u16(data, pos as usize).unwrap();
+            if glyph_array_value == 0 {
+                return None;
+            }
+            let glyph_index = (glyph_array_value as i16).wrapping_add(id_delta);
+            Some(glyph_index as u16)
+        }
+    }
+
     pub fn lookup_glyph_id(&'a self, code_point: u16) -> Option<u16> {
         if self.get_format() != 4 {
             return None;
@@ -264,24 +272,7 @@ impl<'a> Encoding<'a> {
                     size /= 2;
                     index -= size;
                 } else {
-                    let id_range_offset_pos =
-                        Self::get_id_range_offset_position(seg_count) + 2 * index;
-                    let id_range_offset_value =
-                        get_u16(data, id_range_offset_pos as usize).unwrap();
-                    let id_delta_pos = Self::get_id_deltas_position(seg_count) + 2 * index;
-                    let id_delta = get_i16(data, id_delta_pos as usize).unwrap();
-                    return if id_range_offset_value == 0 {
-                        Some((code_point as i16 + id_delta) as u16)
-                    } else {
-                        let delta = (code_point - start_value) * 2;
-                        let pos = id_range_offset_pos + delta + id_range_offset_value;
-                        let glyph_array_value = get_u16(data, pos as usize).unwrap();
-                        if glyph_array_value == 0 {
-                            return None;
-                        }
-                        let glyph_index = glyph_array_value as i16 + id_delta;
-                        Some(glyph_index as u16)
-                    };
+                    return self.extract_glyph_id(code_point, start_value, seg_count, index);
                 }
             } else {
                 size /= 2;
@@ -314,22 +305,19 @@ struct Cmap<'a>(&'a [u8]);
 
 impl<'a> Cmap<'a> {
     fn get_version(&'a self) -> u16 {
-        let &Cmap(data) = self;
-        get_u16(data, 0).unwrap()
+        get_u16(self.0, 0).unwrap()
     }
 
     fn get_num_tables(&'a self) -> u16 {
-        let &Cmap(data) = self;
-        get_u16(data, 2).unwrap()
+        get_u16(self.0, 2).unwrap()
     }
 
     fn get_encoding_record(&'a self, index: u16) -> Option<EncodingRecord<'a>> {
         if index > self.get_num_tables() {
             return None;
         }
-        let &Cmap(data) = self;
         let enc_offset = (index * 8 + 4) as usize;
-        let encoding_data = &data[enc_offset as usize..(enc_offset + 12) as usize];
+        let encoding_data = &self.0[enc_offset as usize..(enc_offset + 12) as usize];
         Some(EncodingRecord(encoding_data))
     }
 
@@ -345,11 +333,10 @@ impl<'a> Cmap<'a> {
         if index > self.get_num_tables() {
             return None;
         }
-        let &Cmap(data) = self;
         let record = self.get_encoding_record(index).unwrap();
-        let subtable_len = get_u16(data, (record.get_offset() + 2) as usize).unwrap() as u32;
+        let subtable_len = get_u16(self.0, (record.get_offset() + 2) as usize).unwrap() as u32;
         let encoding_data =
-            &data[record.get_offset() as usize..(record.get_offset() + subtable_len) as usize];
+            &self.0[record.get_offset() as usize..(record.get_offset() + subtable_len) as usize];
         Some(Encoding(encoding_data))
     }
 
