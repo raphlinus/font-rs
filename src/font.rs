@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::result::Result;
 
 use geom::{affine_pt, Affine, Point};
@@ -78,13 +78,11 @@ struct Head<'a>(&'a [u8]);
 
 impl<'a> Head<'a> {
     fn index_to_loc_format(&'a self) -> i16 {
-        let &Head(data) = self;
-        get_i16(data, 50).unwrap()
+        get_i16(self.0, 50).unwrap()
     }
 
     fn units_per_em(&'a self) -> u16 {
-        let &Head(data) = self;
-        get_u16(data, 18).unwrap()
+        get_u16(self.0, 18).unwrap()
     }
 }
 
@@ -102,12 +100,268 @@ struct Loca<'a>(&'a [u8]);
 
 impl<'a> Loca<'a> {
     fn get_off(&'a self, glyph_ix: u16, fmt: i16) -> Option<u32> {
-        let &Loca(data) = self;
         if fmt != 0 {
-            get_u32(data, glyph_ix as usize * 4)
+            get_u32(self.0, glyph_ix as usize * 4)
         } else {
-            get_u16(data, glyph_ix as usize * 2).map(|raw| raw as u32 * 2)
+            get_u16(self.0, glyph_ix as usize * 2).map(|raw| raw as u32 * 2)
         }
+    }
+}
+
+struct EncodingRecord<'a>(&'a [u8]);
+
+impl<'a> EncodingRecord<'a> {
+    fn get_platform_id(&'a self) -> u16 {
+        get_u16(self.0, 0).unwrap()
+    }
+
+    fn get_encoding_id(&'a self) -> u16 {
+        get_u16(self.0, 2).unwrap()
+    }
+
+    fn get_offset(&'a self) -> u32 {
+        get_u32(self.0, 4).unwrap()
+    }
+}
+
+impl<'a> Debug for EncodingRecord<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("EncodingRecord")
+            .field("platformID", &self.get_platform_id())
+            .field("encodingID", &self.get_encoding_id())
+            .field("offset", &self.get_offset())
+            .finish()
+    }
+}
+
+struct Encoding<'a>(&'a [u8]);
+
+impl<'a> Encoding<'a> {
+    fn get_format(&'a self) -> u16 {
+        get_u16(self.0, 0).unwrap()
+    }
+
+    fn get_length(&'a self) -> u16 {
+        get_u16(self.0, 2).unwrap()
+    }
+
+    fn get_language(&'a self) -> u16 {
+        get_u16(self.0, 4).unwrap()
+    }
+
+    fn get_seg_count_x_2(&'a self) -> u16 {
+        get_u16(self.0, 6).unwrap()
+    }
+
+    fn get_seg_count(&'a self) -> u16 {
+        self.get_seg_count_x_2() / 2
+    }
+
+    fn get_search_range(&'a self) -> u16 {
+        get_u16(self.0, 8).unwrap()
+    }
+
+    fn get_entry_selector(&'a self) -> u16 {
+        get_u16(self.0, 10).unwrap()
+    }
+
+    fn get_range_shift(&'a self) -> u16 {
+        get_u16(self.0, 12).unwrap()
+    }
+
+    fn get_u16_vec(&'a self, start_position: u16, count: u16) -> Vec<u16> {
+        let mut result = vec![];
+        let mut vec_position = start_position;
+        let limit = vec_position + 2 * count;
+        while vec_position < limit {
+            result.push(get_u16(self.0, vec_position as usize).unwrap());
+            vec_position += 2;
+        }
+        result
+    }
+
+    fn get_i16_vec(&'a self, start_position: u16, count: u16) -> Vec<i16> {
+        let mut result = vec![];
+        let mut vec_position = start_position;
+        let limit = vec_position + 2 * count;
+        while vec_position < limit {
+            result.push(get_i16(self.0, vec_position as usize).unwrap());
+            vec_position += 2;
+        }
+        result
+    }
+
+    fn get_end_counts_position() -> u16 {
+        14
+    }
+
+    fn get_end_counts(&'a self) -> Vec<u16> {
+        let seg_count = self.get_seg_count();
+        self.get_u16_vec(Self::get_end_counts_position(), seg_count)
+    }
+
+    fn get_start_counts_position(seg_count: u16) -> u16 {
+        Self::get_end_counts_position() + 2 + 2 * seg_count
+    }
+
+    fn get_start_counts(&'a self) -> Vec<u16> {
+        let seg_count = self.get_seg_count();
+        self.get_u16_vec(Self::get_start_counts_position(seg_count), seg_count)
+    }
+
+    fn get_id_deltas_position(seg_count: u16) -> u16 {
+        Self::get_start_counts_position(seg_count) + 2 * seg_count
+    }
+
+    fn get_id_deltas(&'a self) -> Vec<i16> {
+        let seg_count = self.get_seg_count();
+        self.get_i16_vec(Self::get_id_deltas_position(seg_count), seg_count)
+    }
+
+    fn get_id_range_offset_position(seg_count: u16) -> u16 {
+        Self::get_id_deltas_position(seg_count) + 2 * seg_count
+    }
+
+    fn get_id_range_offsets(&'a self) -> Vec<u16> {
+        let seg_count = self.get_seg_count();
+        self.get_u16_vec(Self::get_id_range_offset_position(seg_count), seg_count)
+    }
+
+    fn extract_glyph_id(
+        &'a self, code_point: u16, start_value: u16, seg_count: u16, seg_index: u16,
+    ) -> Option<u16> {
+        let data = &self.0;
+        let seg_index_pos = 2 * seg_index;
+        let id_range_offset_pos = Self::get_id_range_offset_position(seg_count) + seg_index_pos;
+        let id_range_offset_value = get_u16(data, id_range_offset_pos as usize).unwrap();
+        let id_delta_pos = Self::get_id_deltas_position(seg_count) + seg_index_pos;
+        let id_delta = get_i16(data, id_delta_pos as usize).unwrap();
+        if id_range_offset_value == 0 {
+            Some((code_point as i16 + id_delta) as u16)
+        } else {
+            let delta = (code_point - start_value) * 2;
+            let pos = id_range_offset_pos.wrapping_add(delta) + id_range_offset_value;
+            let glyph_array_value = get_u16(data, pos as usize).unwrap();
+            if glyph_array_value == 0 {
+                return None;
+            }
+            let glyph_index = (glyph_array_value as i16).wrapping_add(id_delta);
+            Some(glyph_index as u16)
+        }
+    }
+
+    pub fn lookup_glyph_id(&'a self, code_point: u16) -> Option<u16> {
+        if self.get_format() != 4 {
+            return None;
+        }
+        let &Encoding(data) = self;
+        let end_counts_position = Self::get_end_counts_position();
+        let seg_count = self.get_seg_count();
+        let mut size = seg_count - 1;
+        let mut index = size / 2;
+        while size > 0 {
+            let search = end_counts_position + index * 2;
+            let end_value = get_u16(data, search as usize).unwrap();
+            if end_value >= code_point {
+                let start_pos = Self::get_start_counts_position(seg_count) + 2 * index;
+                let start_value = get_u16(data, start_pos as usize).unwrap();
+                if start_value > code_point {
+                    size /= 2;
+                    index -= size;
+                } else {
+                    return self.extract_glyph_id(code_point, start_value, seg_count, index);
+                }
+            } else {
+                size /= 2;
+                index += size;
+            }
+        }
+        None
+    }
+}
+
+impl<'a> Debug for Encoding<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Encoding")
+            .field("format", &self.get_format())
+            .field("length", &self.get_length())
+            .field("language", &self.get_language())
+            .field("segCountX2", &self.get_seg_count_x_2())
+            .field("searchRange", &self.get_search_range())
+            .field("entrySelector", &self.get_entry_selector())
+            .field("rangeShift", &self.get_range_shift())
+            .field("endCounts", &self.get_end_counts())
+            .field("startCounts", &self.get_start_counts())
+            .field("idDeltas", &self.get_id_deltas())
+            .field("idRangeOffsets", &self.get_id_range_offsets())
+            .finish()
+    }
+}
+
+struct Cmap<'a>(&'a [u8]);
+
+impl<'a> Cmap<'a> {
+    fn get_version(&'a self) -> u16 {
+        get_u16(self.0, 0).unwrap()
+    }
+
+    fn get_num_tables(&'a self) -> u16 {
+        get_u16(self.0, 2).unwrap()
+    }
+
+    fn get_encoding_record(&'a self, index: u16) -> Option<EncodingRecord<'a>> {
+        if index > self.get_num_tables() {
+            return None;
+        }
+        let enc_offset = (index * 8 + 4) as usize;
+        let encoding_data = &self.0[enc_offset as usize..(enc_offset + 12) as usize];
+        Some(EncodingRecord(encoding_data))
+    }
+
+    fn get_encoding_records(&'a self) -> Vec<EncodingRecord> {
+        let mut encodings = vec![];
+        for i in 0..self.get_num_tables() {
+            encodings.push(self.get_encoding_record(i).unwrap());
+        }
+        encodings
+    }
+
+    fn get_encoding(&'a self, index: u16) -> Option<Encoding<'a>> {
+        if index > self.get_num_tables() {
+            return None;
+        }
+        let record = self.get_encoding_record(index).unwrap();
+        let subtable_len = get_u16(self.0, (record.get_offset() + 2) as usize).unwrap() as u32;
+        let encoding_data =
+            &self.0[record.get_offset() as usize..(record.get_offset() + subtable_len) as usize];
+        Some(Encoding(encoding_data))
+    }
+
+    fn get_encodings(&'a self) -> Vec<Encoding> {
+        let mut encodings = vec![];
+        for i in 0..self.get_num_tables() {
+            encodings.push(self.get_encoding(i).unwrap());
+        }
+        encodings
+    }
+
+    pub fn lookup_glyph_id(&'a self, code_point: u16) -> Option<u16> {
+        for index in 0..self.get_num_tables() {
+            let encoding = self.get_encoding(index).unwrap();
+            return encoding.lookup_glyph_id(code_point);
+        }
+        None
+    }
+}
+
+impl<'a> Debug for Cmap<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Cmap")
+            .field("version", &self.get_version())
+            .field("numTables", &self.get_num_tables())
+            .field("encodingRecords", &self.get_encoding_records())
+            .field("encodings", &self.get_encodings())
+            .finish()
     }
 }
 
@@ -383,6 +637,7 @@ pub struct Font<'a> {
     _tables: HashMap<Tag, &'a [u8]>,
     head: Head<'a>,
     maxp: Maxp<'a>,
+    cmap: Option<Cmap<'a>>,
     loca: Option<Loca<'a>>,
     glyf: Option<&'a [u8]>,
 }
@@ -511,6 +766,13 @@ impl<'a> Font<'a> {
                 },
                 (_, _, _) => None,
             },
+            None => None,
+        }
+    }
+
+    pub fn lookup_glyph_id(&self, code_point: u16) -> Option<u16> {
+        match self.cmap {
+            Some(ref cmap) => cmap.lookup_glyph_id(code_point),
             None => None,
         }
     }
@@ -646,7 +908,7 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
         let offset = get_u32(header, 8).unwrap();
         let length = get_u32(header, 12).unwrap();
         let table_data = &data[offset as usize..(offset + length) as usize];
-        //println!("{}: {}", Tag(tag), tableData.len())
+        //println!("{}: {}", Tag(tag), table_data.len());
         tables.insert(Tag(tag), table_data);
     }
     let head = Head(*tables.get(&Tag::from_str("head")).unwrap()); // todo: don't fail
@@ -655,12 +917,14 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     };
     let loca = tables.get(&Tag::from_str("loca")).map(|&data| Loca(data));
     let glyf = tables.get(&Tag::from_str("glyf")).map(|&data| data);
+    let cmap = tables.get(&Tag::from_str("cmap")).map(|&data| Cmap(data));
     let f = Font {
         _version: version,
         _tables: tables,
         head: head,
         maxp: maxp,
         loca: loca,
+        cmap: cmap,
         glyf: glyf,
     };
     //println!("version = {:x}", version);
@@ -739,3 +1003,26 @@ pub struct GlyphBitmap {
     pub top: i32,
     pub data: Vec<u8>,
 }
+
+#[cfg(test)]
+mod tests {
+
+    use font::parse;
+
+    static FONT_DATA: &'static [u8] =
+        include_bytes!("../fonts/notomono-hinted/NotoMono-Regular.ttf");
+
+    #[test]
+    fn test_cmap_format_4() {
+        let font = parse(&FONT_DATA).unwrap();
+        assert_eq!(font.lookup_glyph_id('A' as u16).unwrap(), 36);
+        assert_eq!(font.lookup_glyph_id(0x3c8).unwrap(), 405);
+        assert_eq!(font.lookup_glyph_id(0xfffd).unwrap(), 589);
+        assert_eq!(font.lookup_glyph_id(0x232B).is_none(), true);
+        // test for panics
+        for i in 0..0xffff {
+            font.lookup_glyph_id(i);
+        }
+    }
+}
+
