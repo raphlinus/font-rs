@@ -230,7 +230,7 @@ impl<'a> Encoding<'a> {
     fn extract_glyph_id(
         &'a self, code_point: u16, start_value: u16, seg_count: u16, seg_index: u16,
     ) -> Option<u16> {
-        let data = &self.0;
+        let data = self.0;
         let seg_index_pos = 2 * seg_index;
         let id_range_offset_pos = Self::get_id_range_offset_position(seg_count) + seg_index_pos;
         let id_range_offset_value = get_u16(data, id_range_offset_pos as usize).unwrap();
@@ -1025,4 +1025,3 @@ mod tests {
         }
     }
 }
-
