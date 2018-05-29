@@ -770,9 +770,15 @@ impl<'a> Font<'a> {
         }
     }
 
-    pub fn lookup_glyph_id(&self, code_point: u16) -> Option<u16> {
+    pub fn lookup_glyph_id(&self, code_point: u32) -> Option<u16> {
         match self.cmap {
-            Some(ref cmap) => cmap.lookup_glyph_id(code_point),
+            Some(ref cmap) => {
+                if code_point > u16::max_value() as u32 {
+                    return None;
+                }
+
+                cmap.lookup_glyph_id(code_point as u16)
+            }
             None => None,
         }
     }
@@ -1015,12 +1021,13 @@ mod tests {
     #[test]
     fn test_cmap_format_4() {
         let font = parse(&FONT_DATA).unwrap();
-        assert_eq!(font.lookup_glyph_id('A' as u16).unwrap(), 36);
+        assert_eq!(font.lookup_glyph_id('A' as u32).unwrap(), 36);
         assert_eq!(font.lookup_glyph_id(0x3c8).unwrap(), 405);
         assert_eq!(font.lookup_glyph_id(0xfffd).unwrap(), 589);
         assert_eq!(font.lookup_glyph_id(0x232B).is_none(), true);
+        assert_eq!(font.lookup_glyph_id(0x1000232B).is_none(), true);
         // test for panics
-        for i in 0..0xffff {
+        for i in 0..0x1ffff {
             font.lookup_glyph_id(i);
         }
     }
