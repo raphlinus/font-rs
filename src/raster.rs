@@ -16,6 +16,7 @@
 
 use std::cmp::min;
 
+use accumulate::accumulate;
 use geom::Point;
 
 // TODO: sort out crate structure. Right now we want this when compiling raster as a binary,
@@ -26,12 +27,6 @@ pub struct Raster {
     w: usize,
     h: usize,
     a: Vec<f32>,
-}
-
-#[cfg(feature = "sse")]
-#[link(name = "accumulate")]
-extern "C" {
-    fn accumulate_sse(src: *const f32, dst: *mut u8, n: u32);
 }
 
 // TODO: is there a faster way? (investigate whether approx recip is good enough)
@@ -138,29 +133,7 @@ impl Raster {
     }
 */
 
-    #[cfg(feature = "sse")]
     pub fn get_bitmap(&self) -> Vec<u8> {
-        let dst_size = self.w * self.h;
-        let dst_cap = (dst_size + 3) & !3;
-        let mut r: Vec<u8> = Vec::with_capacity(dst_cap);
-        unsafe {
-            accumulate_sse(self.a.as_ptr(), r.as_mut_ptr(), dst_cap as u32);
-            r.set_len(dst_size);
-        }
-        r
-    }
-
-    #[cfg(not(feature = "sse"))]
-    pub fn get_bitmap(&self) -> Vec<u8> {
-        let mut acc = 0.0;
-        (0..self.w * self.h)
-            .map(|i| {
-                // This would translate really well to SIMD
-                acc += self.a[i];
-                let y = acc.abs();
-                let y = if y < 1.0 { y } else { 1.0 };
-                (255.0 * y) as u8
-            })
-            .collect()
+        accumulate(&self.a[0..self.w * self.h])
     }
 }
