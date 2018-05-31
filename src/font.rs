@@ -134,9 +134,9 @@ impl<'a> Debug for EncodingRecord<'a> {
     }
 }
 
-struct Encoding<'a>(&'a [u8]);
+struct Format4Encoding<'a>(&'a [u8]);
 
-impl<'a> Encoding<'a> {
+impl<'a> Format4Encoding<'a> {
     fn get_format(&'a self) -> u16 {
         get_u16(self.0, 0).unwrap()
     }
@@ -251,20 +251,16 @@ impl<'a> Encoding<'a> {
     }
 
     pub fn lookup_glyph_id(&'a self, code_point: u16) -> Option<u16> {
-        if self.get_format() != 4 {
-            return None;
-        }
-        let &Encoding(data) = self;
         let end_counts_position = Self::get_end_counts_position();
         let seg_count = self.get_seg_count();
         let mut size = seg_count - 1;
         let mut index = size / 2;
         while size > 0 {
             let search = end_counts_position + index * 2;
-            let end_value = get_u16(data, search as usize).unwrap();
+            let end_value = get_u16(self.0, search as usize).unwrap();
             if end_value >= code_point {
                 let start_pos = Self::get_start_counts_position(seg_count) + 2 * index;
-                let start_value = get_u16(data, start_pos as usize).unwrap();
+                let start_value = get_u16(self.0, start_pos as usize).unwrap();
                 if start_value > code_point {
                     size /= 2;
                     index -= size;
@@ -280,9 +276,9 @@ impl<'a> Encoding<'a> {
     }
 }
 
-impl<'a> Debug for Encoding<'a> {
+impl<'a> Debug for Format4Encoding<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Encoding")
+        f.debug_struct("Format4Encoding")
             .field("format", &self.get_format())
             .field("length", &self.get_length())
             .field("language", &self.get_language())
@@ -326,7 +322,7 @@ impl<'a> Cmap<'a> {
         encodings
     }
 
-    fn get_encoding(&'a self, index: u16) -> Option<Encoding<'a>> {
+    fn get_encoding(&'a self, index: u16) -> Option<Format4Encoding<'a>> {
         if index > self.get_num_tables() {
             return None;
         }
@@ -334,10 +330,10 @@ impl<'a> Cmap<'a> {
         let subtable_len = get_u16(self.0, (record.get_offset() + 2) as usize).unwrap() as u32;
         let encoding_data =
             &self.0[record.get_offset() as usize..(record.get_offset() + subtable_len) as usize];
-        Some(Encoding(encoding_data))
+        Some(Format4Encoding(encoding_data))
     }
 
-    fn get_encodings(&'a self) -> Vec<Encoding> {
+    fn get_encodings(&'a self) -> Vec<Format4Encoding> {
         let mut encodings = vec![];
         for i in 0..self.get_num_tables() {
             encodings.push(self.get_encoding(i).unwrap());
@@ -345,10 +341,14 @@ impl<'a> Cmap<'a> {
         encodings
     }
 
-    pub fn lookup_glyph_id(&'a self, code_point: u16) -> Option<u16> {
+    pub fn find_format_4_encoding(&'a self) -> Option<u16> {
         for index in 0..self.get_num_tables() {
-            let encoding = self.get_encoding(index).unwrap();
-            return encoding.lookup_glyph_id(code_point);
+            let encoding = self.get_encoding(index);
+            if let Some(encoding) = encoding {
+                if encoding.get_format() == 4 {
+                    return Some(index);
+                }
+            }
         }
         None
     }
@@ -640,6 +640,7 @@ pub struct Font<'a> {
     cmap: Option<Cmap<'a>>,
     loca: Option<Loca<'a>>,
     glyf: Option<&'a [u8]>,
+    encoding: Option<u16>,
 }
 
 struct Metrics {
@@ -771,13 +772,18 @@ impl<'a> Font<'a> {
     }
 
     pub fn lookup_glyph_id(&self, code_point: u32) -> Option<u16> {
-        match self.cmap {
-            Some(ref cmap) => {
+        match self.encoding {
+            Some(encoding) => {
                 if code_point > u16::max_value() as u32 {
                     return None;
                 }
 
-                cmap.lookup_glyph_id(code_point as u16)
+                self.cmap
+                    .as_ref()
+                    .unwrap()
+                    .get_encoding(encoding)
+                    .unwrap()
+                    .lookup_glyph_id(code_point as u16)
             }
             None => None,
         }
@@ -924,6 +930,11 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     let loca = tables.get(&Tag::from_str("loca")).map(|&data| Loca(data));
     let glyf = tables.get(&Tag::from_str("glyf")).map(|&data| data);
     let cmap = tables.get(&Tag::from_str("cmap")).map(|&data| Cmap(data));
+    let encoding = if let Some(ref cmap) = cmap {
+        cmap.find_format_4_encoding()
+    } else {
+        None
+    };
     let f = Font {
         _version: version,
         _tables: tables,
@@ -932,6 +943,7 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
         loca: loca,
         cmap: cmap,
         glyf: glyf,
+        encoding: encoding,
     };
     //println!("version = {:x}", version);
     Ok(f)
