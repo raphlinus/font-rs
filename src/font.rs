@@ -306,7 +306,7 @@ impl<'a> Cmap<'a> {
     }
 
     fn get_encoding_record(&'a self, index: u16) -> Option<EncodingRecord<'a>> {
-        if index > self.get_num_tables() {
+        if index >= self.get_num_tables() {
             return None;
         }
         let enc_offset = (index * 8 + 4) as usize;
@@ -323,7 +323,7 @@ impl<'a> Cmap<'a> {
     }
 
     fn get_encoding(&'a self, index: u16) -> Option<EncodingFormat4<'a>> {
-        if index > self.get_num_tables() {
+        if index >= self.get_num_tables() {
             return None;
         }
         let record = self.get_encoding_record(index).unwrap();
@@ -1033,6 +1033,9 @@ mod tests {
     #[test]
     fn test_cmap_format_4() {
         let font = parse(&FONT_DATA).unwrap();
+        let cmap = font.cmap.as_ref().unwrap();
+        assert!(cmap.get_encoding_record(cmap.get_num_tables()).is_none());
+        assert!(cmap.get_encoding(cmap.get_num_tables()).is_none());
         assert_eq!(font.lookup_glyph_id('A' as u32).unwrap(), 36);
         assert_eq!(font.lookup_glyph_id(0x3c8).unwrap(), 405);
         assert_eq!(font.lookup_glyph_id(0xfffd).unwrap(), 589);
