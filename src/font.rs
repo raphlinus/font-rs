@@ -77,11 +77,11 @@ fn get_u32(data: &[u8], off: usize) -> Option<u32> {
 struct Head<'a>(&'a [u8]);
 
 impl<'a> Head<'a> {
-    fn index_to_loc_format(&'a self) -> i16 {
+    fn index_to_loc_format(&self) -> i16 {
         get_i16(self.0, 50).unwrap()
     }
 
-    fn units_per_em(&'a self) -> u16 {
+    fn units_per_em(&self) -> u16 {
         get_u16(self.0, 18).unwrap()
     }
 }
@@ -91,7 +91,7 @@ struct Maxp<'a> {
 }
 
 impl<'a> Maxp<'a> {
-    fn num_glyphs(&'a self) -> u16 {
+    fn num_glyphs(&self) -> u16 {
         get_u16(self.data, 4).unwrap()
     }
 }
@@ -99,7 +99,7 @@ impl<'a> Maxp<'a> {
 struct Loca<'a>(&'a [u8]);
 
 impl<'a> Loca<'a> {
-    fn get_off(&'a self, glyph_ix: u16, fmt: i16) -> Option<u32> {
+    fn get_off(&self, glyph_ix: u16, fmt: i16) -> Option<u32> {
         if fmt != 0 {
             get_u32(self.0, glyph_ix as usize * 4)
         } else {
@@ -111,15 +111,15 @@ impl<'a> Loca<'a> {
 struct EncodingRecord<'a>(&'a [u8]);
 
 impl<'a> EncodingRecord<'a> {
-    fn get_platform_id(&'a self) -> u16 {
+    fn get_platform_id(&self) -> u16 {
         get_u16(self.0, 0).unwrap()
     }
 
-    fn get_encoding_id(&'a self) -> u16 {
+    fn get_encoding_id(&self) -> u16 {
         get_u16(self.0, 2).unwrap()
     }
 
-    fn get_offset(&'a self) -> u32 {
+    fn get_offset(&self) -> u32 {
         get_u32(self.0, 4).unwrap()
     }
 }
@@ -134,42 +134,68 @@ impl<'a> Debug for EncodingRecord<'a> {
     }
 }
 
-struct EncodingFormat4<'a>(&'a [u8]);
+struct Encoding<'a>(&'a [u8]);
 
-impl<'a> EncodingFormat4<'a> {
-    fn get_format(&'a self) -> u16 {
+impl<'a> Encoding<'a> {
+    fn get_format(&self) -> u16 {
         get_u16(self.0, 0).unwrap()
     }
 
-    fn get_length(&'a self) -> u16 {
+    fn get_length(&self) -> u16 {
         get_u16(self.0, 2).unwrap()
     }
 
-    fn get_language(&'a self) -> u16 {
+    fn get_language(&self) -> u16 {
+        get_u16(self.0, 4).unwrap()
+    }
+}
+
+impl<'a> Debug for Encoding<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Encoding")
+            .field("format", &self.get_format())
+            .field("length", &self.get_length())
+            .field("language", &self.get_language())
+            .finish()
+    }
+}
+
+struct EncodingFormat4<'a>(&'a [u8]);
+
+impl<'a> EncodingFormat4<'a> {
+    fn get_format(&self) -> u16 {
+        get_u16(self.0, 0).unwrap()
+    }
+
+    fn get_length(&self) -> u16 {
+        get_u16(self.0, 2).unwrap()
+    }
+
+    fn get_language(&self) -> u16 {
         get_u16(self.0, 4).unwrap()
     }
 
-    fn get_seg_count_x_2(&'a self) -> u16 {
+    fn get_seg_count_x_2(&self) -> u16 {
         get_u16(self.0, 6).unwrap()
     }
 
-    fn get_seg_count(&'a self) -> u16 {
+    fn get_seg_count(&self) -> u16 {
         self.get_seg_count_x_2() / 2
     }
 
-    fn get_search_range(&'a self) -> u16 {
+    fn get_search_range(&self) -> u16 {
         get_u16(self.0, 8).unwrap()
     }
 
-    fn get_entry_selector(&'a self) -> u16 {
+    fn get_entry_selector(&self) -> u16 {
         get_u16(self.0, 10).unwrap()
     }
 
-    fn get_range_shift(&'a self) -> u16 {
+    fn get_range_shift(&self) -> u16 {
         get_u16(self.0, 12).unwrap()
     }
 
-    fn get_u16_vec(&'a self, start_position: u16, count: u16) -> Vec<u16> {
+    fn get_u16_vec(&self, start_position: u16, count: u16) -> Vec<u16> {
         let mut result = vec![];
         let mut vec_position = start_position;
         let limit = vec_position + 2 * count;
@@ -180,7 +206,7 @@ impl<'a> EncodingFormat4<'a> {
         result
     }
 
-    fn get_i16_vec(&'a self, start_position: u16, count: u16) -> Vec<i16> {
+    fn get_i16_vec(&self, start_position: u16, count: u16) -> Vec<i16> {
         let mut result = vec![];
         let mut vec_position = start_position;
         let limit = vec_position + 2 * count;
@@ -195,7 +221,7 @@ impl<'a> EncodingFormat4<'a> {
         14
     }
 
-    fn get_end_counts(&'a self) -> Vec<u16> {
+    fn get_end_counts(&self) -> Vec<u16> {
         let seg_count = self.get_seg_count();
         self.get_u16_vec(Self::get_end_counts_position(), seg_count)
     }
@@ -204,7 +230,7 @@ impl<'a> EncodingFormat4<'a> {
         Self::get_end_counts_position() + 2 + 2 * seg_count
     }
 
-    fn get_start_counts(&'a self) -> Vec<u16> {
+    fn get_start_counts(&self) -> Vec<u16> {
         let seg_count = self.get_seg_count();
         self.get_u16_vec(Self::get_start_counts_position(seg_count), seg_count)
     }
@@ -213,7 +239,7 @@ impl<'a> EncodingFormat4<'a> {
         Self::get_start_counts_position(seg_count) + 2 * seg_count
     }
 
-    fn get_id_deltas(&'a self) -> Vec<i16> {
+    fn get_id_deltas(&self) -> Vec<i16> {
         let seg_count = self.get_seg_count();
         self.get_i16_vec(Self::get_id_deltas_position(seg_count), seg_count)
     }
@@ -222,13 +248,13 @@ impl<'a> EncodingFormat4<'a> {
         Self::get_id_deltas_position(seg_count) + 2 * seg_count
     }
 
-    fn get_id_range_offsets(&'a self) -> Vec<u16> {
+    fn get_id_range_offsets(&self) -> Vec<u16> {
         let seg_count = self.get_seg_count();
         self.get_u16_vec(Self::get_id_range_offset_position(seg_count), seg_count)
     }
 
     fn extract_glyph_id(
-        &'a self, code_point: u16, start_value: u16, seg_count: u16, seg_index: u16,
+        &self, code_point: u16, start_value: u16, seg_count: u16, seg_index: u16,
     ) -> Option<u16> {
         let data = self.0;
         let seg_index_pos = 2 * seg_index;
@@ -250,7 +276,7 @@ impl<'a> EncodingFormat4<'a> {
         }
     }
 
-    pub fn lookup_glyph_id(&'a self, code_point: u16) -> Option<u16> {
+    pub fn lookup_glyph_id(&self, code_point: u16) -> Option<u16> {
         let end_counts_position = Self::get_end_counts_position();
         let seg_count = self.get_seg_count();
         let mut size = seg_count - 1;
@@ -297,15 +323,15 @@ impl<'a> Debug for EncodingFormat4<'a> {
 struct Cmap<'a>(&'a [u8]);
 
 impl<'a> Cmap<'a> {
-    fn get_version(&'a self) -> u16 {
+    fn get_version(&self) -> u16 {
         get_u16(self.0, 0).unwrap()
     }
 
-    fn get_num_tables(&'a self) -> u16 {
+    fn get_num_tables(&self) -> u16 {
         get_u16(self.0, 2).unwrap()
     }
 
-    fn get_encoding_record(&'a self, index: u16) -> Option<EncodingRecord<'a>> {
+    fn get_encoding_record(&self, index: u16) -> Option<EncodingRecord<'a>> {
         if index >= self.get_num_tables() {
             return None;
         }
@@ -314,7 +340,7 @@ impl<'a> Cmap<'a> {
         Some(EncodingRecord(encoding_data))
     }
 
-    fn get_encoding_records(&'a self) -> Vec<EncodingRecord> {
+    fn get_encoding_records(&self) -> Vec<EncodingRecord> {
         let mut encodings = vec![];
         for i in 0..self.get_num_tables() {
             encodings.push(self.get_encoding_record(i).unwrap());
@@ -322,8 +348,20 @@ impl<'a> Cmap<'a> {
         encodings
     }
 
-    fn get_encoding(&'a self, index: u16) -> Option<EncodingFormat4<'a>> {
+    fn get_encoding(&self, index: u16) -> Option<Encoding<'a>> {
         if index >= self.get_num_tables() {
+            return None;
+        }
+        let record = self.get_encoding_record(index).unwrap();
+        let subtable_len = get_u16(self.0, (record.get_offset() + 2) as usize).unwrap() as u32;
+        let encoding_data =
+            &self.0[record.get_offset() as usize..(record.get_offset() + subtable_len) as usize];
+        Some(Encoding(encoding_data))
+    }
+
+    fn get_encoding_format_4_at(&self, index: u16) -> Option<EncodingFormat4<'a>> {
+        let encoding = self.get_encoding(index);
+        if encoding.is_none() || encoding.unwrap().get_format() != 4 {
             return None;
         }
         let record = self.get_encoding_record(index).unwrap();
@@ -333,7 +371,7 @@ impl<'a> Cmap<'a> {
         Some(EncodingFormat4(encoding_data))
     }
 
-    fn get_encodings(&'a self) -> Vec<EncodingFormat4> {
+    fn get_encodings(&self) -> Vec<Encoding> {
         let mut encodings = vec![];
         for i in 0..self.get_num_tables() {
             encodings.push(self.get_encoding(i).unwrap());
@@ -341,7 +379,7 @@ impl<'a> Cmap<'a> {
         encodings
     }
 
-    pub fn find_format_4_encoding(&'a self) -> Option<u16> {
+    pub fn find_format_4_encoding(&self) -> Option<u16> {
         for index in 0..self.get_num_tables() {
             let encoding = self.get_encoding(index);
             if let Some(encoding) = encoding {
@@ -385,15 +423,15 @@ struct SimpleGlyph<'a> {
 }
 
 impl<'a> SimpleGlyph<'a> {
-    fn number_of_contours(&'a self) -> i16 {
+    fn number_of_contours(&self) -> i16 {
         get_i16(self.data, 0).unwrap()
     }
 
-    fn bbox(&'a self) -> (i16, i16, i16, i16) {
+    fn bbox(&self) -> (i16, i16, i16, i16) {
         get_bbox_raw(self.data)
     }
 
-    fn points(&'a self) -> GlyphPoints<'a> {
+    fn points(&self) -> GlyphPoints<'a> {
         let data = self.data;
         let n_contours = self.number_of_contours();
         let insn_len_off = 10 + 2 * n_contours as usize;
@@ -773,7 +811,7 @@ impl<'a> Font<'a> {
 
     pub fn lookup_glyph_id(&self, code_point: u32) -> Option<u16> {
         match self.encoding_index {
-            Some(encoding) => {
+            Some(encoding_index) => {
                 if code_point > u16::max_value() as u32 {
                     return None;
                 }
@@ -781,7 +819,7 @@ impl<'a> Font<'a> {
                 self.cmap
                     .as_ref()
                     .unwrap()
-                    .get_encoding(encoding)
+                    .get_encoding_format_4_at(encoding_index)
                     .unwrap()
                     .lookup_glyph_id(code_point as u16)
             }
@@ -930,11 +968,7 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     let loca = tables.get(&Tag::from_str("loca")).map(|&data| Loca(data));
     let glyf = tables.get(&Tag::from_str("glyf")).map(|&data| data);
     let cmap = tables.get(&Tag::from_str("cmap")).map(|&data| Cmap(data));
-    let encoding_index = if let Some(ref cmap) = cmap {
-        cmap.find_format_4_encoding()
-    } else {
-        None
-    };
+    let encoding_index = cmap.as_ref().and_then(|cmap| cmap.find_format_4_encoding());
     let f = Font {
         _version: version,
         _tables: tables,
