@@ -19,15 +19,11 @@ extern crate test;
 use font_rs::font;
 use test::Bencher;
 
-use std::fs::File;
-use std::io::Read;
+static FONT_DATA: &'static [u8] =
+    include_bytes!("../fonts/notomono-hinted/NotoMono-Regular.ttf");
 
 fn glyphbench(b: &mut Bencher, size: u32) {
-    let filename = "misc/wt024.ttf";
-    let mut file = File::open(filename).unwrap();
-    let mut data = Vec::new();
-    file.read_to_end(&mut data).unwrap();
-    let font = font::parse(&data).unwrap();
+    let font = font::parse(&FONT_DATA).unwrap();
     b.iter(|| font.render_glyph(6000, size));
 }
 
