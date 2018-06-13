@@ -24,7 +24,7 @@ static FONT_DATA: &'static [u8] =
 
 fn glyphbench(b: &mut Bencher, size: u32) {
     let font = font::parse(&FONT_DATA).unwrap();
-    b.iter(|| font.render_glyph(6000, size));
+    b.iter(|| font.render_glyph(200, size));
 }
 
 #[bench]
