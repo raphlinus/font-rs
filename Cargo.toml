@@ -11,5 +11,5 @@ build = "build.rs"
 [features]
 sse = []
 
-[target.'cfg(target_arch = "x86")'.build-dependencies]
+[target.'cfg(target_feature = "sse")'.build-dependencies]
 gcc = "0.3"

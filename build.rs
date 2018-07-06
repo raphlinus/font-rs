@@ -1,8 +1,8 @@
-#[cfg(target_arch = "x86")]
+#[cfg(feature="sse")]
 extern crate gcc;
 
 fn main() {
-    #[cfg(target_arch = "x86")]
+    #[cfg(feature="sse")]
     gcc::Build::new()
         .file("src/accumulate.c")
         .flag("-march=native")
