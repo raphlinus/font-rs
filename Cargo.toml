@@ -6,10 +6,6 @@ authors = [ "Raph Levien <raph@google.com>" ]
 keywords = ["font", "truetype", "ttf"]
 description = "A font renderer written (mostly) in pure, safe Rust"
 repository = "https://github.com/google/font-rs"
-build = "build.rs"
 
 [features]
 sse = []
-
-[target.'cfg(target_feature = "sse")'.build-dependencies]
-gcc = "0.3"

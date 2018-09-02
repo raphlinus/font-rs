@@ -12,10 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "sse")]
-#[link(name = "accumulate")]
-extern "C" {
-    fn accumulate_sse(src: *const f32, dst: *mut u8, n: u32);
+use std::mem;
+
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+
+macro_rules! _mm_shuffle {
+    ($z:expr, $y:expr, $x:expr, $w:expr) => {
+        ($z << 6) | ($y << 4) | ($x << 2) | $w
+    };
 }
 
 #[cfg(feature = "sse")]
@@ -28,11 +36,33 @@ pub fn accumulate(src: &[f32]) -> Vec<u8> {
     // and so on
     let len = src.len();
     let n = (len + 3) & !3; // align data
-    let mut dst: Vec<u8> = Vec::with_capacity(n);
+    let mut dst: Vec<u8> = vec![0; n];
+
     unsafe {
-        accumulate_sse(src.as_ptr(), dst.as_mut_ptr(), n as u32);
+        let mut offset = _mm_setzero_ps();
+        let sign_mask = _mm_set1_ps(-0.);
+        let mask = _mm_set1_epi32(0x0c080400);
+
+        for i in (0..n).step_by(4) {
+            let mut x = _mm_loadu_ps(&src[i]);
+            x = _mm_add_ps(x, _mm_castsi128_ps(_mm_slli_si128(_mm_castps_si128(x), 4)));
+            x = _mm_add_ps(x, _mm_shuffle_ps(_mm_setzero_ps(), x, 0x40));
+            x = _mm_add_ps(x, offset);
+
+            let mut y = _mm_andnot_ps(sign_mask, x); // fabs(x)
+            y = _mm_min_ps(y, _mm_set1_ps(1.0));
+            y = _mm_mul_ps(y, _mm_set1_ps(255.0));
+
+            let mut z = _mm_cvttps_epi32(y);
+            z = _mm_shuffle_epi8(z, mask);
+
+            _mm_store_ss(mem::transmute(&dst[i]), _mm_castsi128_ps(z));
+            offset = _mm_shuffle_ps(x, x, _mm_shuffle!(3, 3, 3, 3));
+        }
+
         dst.set_len(len); // we must return vec of the same length as src.len()
     }
+
     dst
 }
 
