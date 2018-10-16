@@ -160,6 +160,10 @@ impl<'a> Debug for Encoding<'a> {
     }
 }
 
+fn wrapping_i16_as_u16(i: i16) -> u16 {
+    unsafe { std::mem::transmute(i) }
+}
+
 struct EncodingFormat4<'a>(&'a [u8]);
 
 impl<'a> EncodingFormat4<'a> {
@@ -263,7 +267,7 @@ impl<'a> EncodingFormat4<'a> {
         let id_delta_pos = Self::get_id_deltas_position(seg_count) + seg_index_pos;
         let id_delta = get_i16(data, id_delta_pos as usize).unwrap();
         if id_range_offset_value == 0 {
-            Some((code_point as i32 + id_delta as i32) as u16)
+            Some(code_point.wrapping_add(wrapping_i16_as_u16(id_delta)))
         } else {
             let delta = (code_point - start_value) * 2;
             let pos = id_range_offset_pos.wrapping_add(delta) + id_range_offset_value;
