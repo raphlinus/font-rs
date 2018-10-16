@@ -263,7 +263,7 @@ impl<'a> EncodingFormat4<'a> {
         let id_delta_pos = Self::get_id_deltas_position(seg_count) + seg_index_pos;
         let id_delta = get_i16(data, id_delta_pos as usize).unwrap();
         if id_range_offset_value == 0 {
-            Some((code_point as i16 + id_delta) as u16)
+            Some(code_point.wrapping_add(id_delta as u16))
         } else {
             let delta = (code_point - start_value) * 2;
             let pos = id_range_offset_pos.wrapping_add(delta) + id_range_offset_value;
