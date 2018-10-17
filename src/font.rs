@@ -279,8 +279,8 @@ impl<'a> EncodingFormat4<'a> {
     pub fn lookup_glyph_id(&self, code_point: u16) -> Option<u16> {
         let end_counts_position = Self::get_end_counts_position();
         let seg_count = self.get_seg_count();
-        let mut size = seg_count - 2;
-        let mut index = size / 2;
+        let mut size = seg_count - 1;
+        let mut index = (size+1) / 2;
         while size > 0 {
             let search = end_counts_position + index * 2;
             let end_value = get_u16(self.0, search as usize).unwrap();
