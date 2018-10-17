@@ -1080,4 +1080,27 @@ mod tests {
             font.lookup_glyph_id(i);
         }
     }
+
+    static KOSUGI_MARU_ENCODING_4: &'static [u8] =
+        include_bytes!("../fonts/kosugi_maru/kosugi_maru_enc_4.bin");
+
+    static KANJI: &'static str = "\
+        一九七二人入八力十下三千上口土夕大女子小山川五天中六円手文日月木水火犬王正出本右四左\
+        玉生田白目石立百年休先名字早気竹糸耳虫村男町花見貝赤足車学林空金雨青草音校森刀万丸才\
+        工弓内午少元今公分切友太引心戸方止毛父牛半市北古台兄冬外広母用矢交会合同回寺地多光当\
+        毎池米羽考肉自色行西来何作体弟図声売形汽社角言谷走近里麦画東京夜直国姉妹岩店明歩知長\
+        門昼前南点室後春星海活思科秋茶計風食首夏弱原家帰時紙書記通馬高強教理細組船週野雪魚鳥\
+        黄黒場晴答絵買朝道番間雲園数新楽話遠電鳴歌算語読聞線親頭曜顔丁予化区反央平申世由氷主\
+        仕他代写号去打皮皿礼両曲向州全次安守式死列羊有血住助医君坂局役投対決究豆身返表事育使\
+        命味幸始実定岸所放昔板泳注波油受物具委和者取服苦重乗係品客県屋炭度待急指持拾昭相柱";
+
+    #[test]
+    fn test_glyph_lookup_format_4() {
+        use font::EncodingFormat4;
+        let encoding4 = EncodingFormat4(KOSUGI_MARU_ENCODING_4);
+        for kanji in KANJI.chars() {
+            assert!(encoding4.lookup_glyph_id(kanji as u16).is_some());
+        }
+        assert!(encoding4.lookup_glyph_id('\n' as u16).is_none());
+    }
 }
