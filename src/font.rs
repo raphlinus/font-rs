@@ -279,7 +279,7 @@ impl<'a> EncodingFormat4<'a> {
     pub fn lookup_glyph_id(&self, code_point: u16) -> Option<u16> {
         let end_counts_position = Self::get_end_counts_position();
         let seg_count = self.get_seg_count();
-        let mut size = seg_count - 1;
+        let mut size = seg_count - 2;
         let mut index = size / 2;
         while size > 0 {
             let search = end_counts_position + index * 2;
@@ -288,13 +288,16 @@ impl<'a> EncodingFormat4<'a> {
                 let start_pos = Self::get_start_counts_position(seg_count) + 2 * index;
                 let start_value = get_u16(self.0, start_pos as usize).unwrap();
                 if start_value > code_point {
-                    size /= 2;
+                    if index == 0 {
+                        return None
+                    }
+                    size = (size+1) / 2;
                     index -= size;
                 } else {
                     return self.extract_glyph_id(code_point, start_value, seg_count, index);
                 }
             } else {
-                size /= 2;
+                size = (size+1) / 2;
                 index += size;
             }
         }
