@@ -108,6 +108,44 @@ impl<'a> Loca<'a> {
     }
 }
 
+struct Hhea<'a>(&'a [u8]);
+
+impl<'a> Hhea<'a> {
+    fn ascent(&self) -> Option<u16> {
+        get_u16(self.0, 4)
+    }
+
+    fn descent(&self) -> Option<u16> {
+        get_u16(self.0, 6)
+    }
+
+    fn line_gap(&self) -> Option<u16> {
+        get_u16(self.0, 8)
+    }
+
+    fn num_of_long_hor_metrics(&self) -> Option<u16> {
+        get_u16(self.0, 34)
+    }
+}
+
+struct Hmtx<'a>(&'a [u8]);
+
+impl<'a> Hmtx<'a> {
+    fn get_h_metrics(&self, glyph_id: u16, num_of_long_hor_metrics: u16) -> (Option<u16>, Option<i16>) {
+        if glyph_id < num_of_long_hor_metrics {
+            let advance_width = get_u16(self.0, 4 * glyph_id as usize);
+            let left_side_bearing = get_i16(self.0, 4 * glyph_id as usize + 2);
+            (advance_width, left_side_bearing)
+        } else {
+            let advance_width = get_u16(self.0, 4 * (num_of_long_hor_metrics as usize - 1));
+            let left_side_bearing = get_i16(self.0,
+                4 * num_of_long_hor_metrics as usize +
+                2 * (glyph_id as usize - num_of_long_hor_metrics as usize));
+            (advance_width, left_side_bearing)
+        }
+    }
+}
+
 struct EncodingRecord<'a>(&'a [u8]);
 
 impl<'a> EncodingRecord<'a> {
@@ -679,6 +717,8 @@ pub struct Font<'a> {
     loca: Option<Loca<'a>>,
     glyf: Option<&'a [u8]>,
     encoding_index: Option<u16>,
+    hhea: Option<Hhea<'a>>,
+    hmtx: Option<Hmtx<'a>>,
 }
 
 struct Metrics {
@@ -698,12 +738,27 @@ impl Metrics {
     }
 }
 
+pub struct VMetrics {
+    pub ascent: f32,
+    pub descent: f32,
+    pub line_gap: f32,
+}
+
+pub struct HMetrics {
+    pub advance_width: f32,
+    pub left_side_bearing: f32,
+}
+
 impl<'a> Font<'a> {
+    fn scale(&self, size: u32) -> f32 {
+        let ppem = self.head.units_per_em();
+        (size as f32) / (ppem as f32)
+    }
+
     fn metrics_and_affine(
         &self, xmin: i16, ymin: i16, xmax: i16, ymax: i16, size: u32,
     ) -> (Metrics, Affine) {
-        let ppem = self.head.units_per_em();
-        let scale = (size as f32) / (ppem as f32);
+        let scale = self.scale(size);
         let l = (xmin as f32 * scale).floor() as i32;
         let t = (ymax as f32 * -scale).floor() as i32;
         let r = (xmax as f32 * scale).ceil() as i32;
@@ -824,6 +879,49 @@ impl<'a> Font<'a> {
                     .lookup_glyph_id(code_point as u16)
             }
             None => None,
+        }
+    }
+
+    pub fn get_v_metrics(&self, size: u32) -> Option<VMetrics> {
+        if let Some(ref hhea) = self.hhea {
+            match (
+                hhea.ascent(),
+                hhea.descent(),
+                hhea.line_gap(),
+            ) {
+                (Some(ascent), Some(descent), Some(line_gap)) => {
+                    let scale = self.scale(size);
+                    Some(VMetrics {
+                        ascent: ascent as f32 * scale,
+                        descent: descent as f32 * scale,
+                        line_gap: line_gap as f32 * scale,
+                    })
+                },
+                (_, _, _) => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn get_h_metrics(&self, glyph_id: u16, size: u32) -> Option<HMetrics> {
+        if let (Some(ref hhea), Some(ref hmtx)) = (&self.hhea, &self.hmtx) {
+            if let Some(num_of_long_hor_metrics) = hhea.num_of_long_hor_metrics() {
+                match hmtx.get_h_metrics(glyph_id, num_of_long_hor_metrics) {
+                    (Some(advance_width), Some(left_side_bearing)) => {
+                        let scale = self.scale(size);
+                        Some(HMetrics {
+                            advance_width: advance_width as f32 * scale,
+                            left_side_bearing: left_side_bearing as f32 * scale,
+                        })
+                    },
+                    (_, _) => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 }
@@ -969,6 +1067,8 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     let glyf = tables.get(&Tag::from_str("glyf")).map(|&data| data);
     let cmap = tables.get(&Tag::from_str("cmap")).map(|&data| Cmap(data));
     let encoding_index = cmap.as_ref().and_then(|cmap| cmap.find_format_4_encoding());
+    let hhea = tables.get(&Tag::from_str("hhea")).map(|&data| Hhea(data));
+    let hmtx = tables.get(&Tag::from_str("hmtx")).map(|&data| Hmtx(data));
     let f = Font {
         _version: version,
         _tables: tables,
@@ -978,6 +1078,8 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
         cmap: cmap,
         glyf: glyf,
         encoding_index: encoding_index,
+        hhea: hhea,
+        hmtx: hmtx,
     };
     //println!("version = {:x}", version);
     Ok(f)
