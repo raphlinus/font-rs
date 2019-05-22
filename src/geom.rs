@@ -41,6 +41,13 @@ impl Point {
     }
 }
 
+#[cfg(feature = "kurbo")]
+impl From<Point> for kurbo::Vec2 {
+    fn from(pt: Point) -> kurbo::Vec2 {
+        kurbo::Vec2::new(pt.x as f64, pt.y as f64)
+    }
+}
+
 impl Debug for Point {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "({}, {})", self.x, self.y)
@@ -57,8 +64,16 @@ pub struct Affine {
     f: f32,
 }
 
+impl Default for Affine {
+    fn default() -> Affine {
+        Affine { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }
+    }
+}
+
 impl Affine {
     /// Concatenate two affine transforms.
+    ///
+    /// TODO: deprecate use of this in favor of the multiply op.
     pub fn concat(t1: &Affine, t2: &Affine) -> Affine {
         Affine {
             a: t1.a * t2.a + t1.c * t2.b,
@@ -75,6 +90,14 @@ pub fn affine_pt(z: &Affine, p: &Point) -> Point {
     Point {
         x: z.a * p.x + z.c * p.y + z.e,
         y: z.b * p.x + z.d * p.y + z.f,
+    }
+}
+
+impl<'a> std::ops::Mul<Point> for &'a Affine {
+    type Output = Point;
+
+    fn mul(self, rhs: Point) -> Point {
+        affine_pt(self, &rhs)
     }
 }
 

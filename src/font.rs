@@ -22,6 +22,9 @@ use std::result::Result;
 use geom::{affine_pt, Affine, Point};
 use raster::Raster;
 
+#[cfg(feature = "kurbo")]
+use kurbo::BezPath;
+
 #[derive(PartialEq, Eq, Hash)]
 struct Tag(u32);
 
@@ -633,7 +636,8 @@ struct Components<'a> {
     ix: usize,
 }
 
-const ARG_1_AND_2_ARE_WORDS: u16 = 1;
+const ARG_1_AND_2_ARE_WORDS: u16 = 1 << 0;
+const ARGS_ARE_XY_VALUES: u16 = 1 << 1;
 const WE_HAVE_A_SCALE: u16 = 1 << 3;
 const MORE_COMPONENTS: u16 = 1 << 5;
 const WE_HAVE_AN_X_AND_Y_SCALE: u16 = 1 << 6;
@@ -657,10 +661,17 @@ impl<'a> Iterator for Components<'a> {
             arg2 = get_i16(self.data, self.ix).unwrap();
             self.ix += 2;
         } else {
-            arg1 = self.data[self.ix] as i16;
+            let byte1 = self.data[self.ix];
             self.ix += 1;
-            arg2 = self.data[self.ix] as i16;
+            let byte2 = self.data[self.ix];
             self.ix += 1;
+            if (flags & ARGS_ARE_XY_VALUES) != 0 {
+                arg1 = (byte1 as i8) as i16;
+                arg2 = (byte2 as i8) as i16;
+            } else {
+                arg1 = byte1 as i16;
+                arg2 = byte2 as i16;
+            }
         }
         let mut a = 1.0;
         let mut b = 0.0;
@@ -685,9 +696,14 @@ impl<'a> Iterator for Components<'a> {
             self.ix += 2;
             d = a;
         }
-        // TODO: handle non-ARGS_ARE_XY_VALUES case
-        let x = arg1 as f32;
-        let y = arg2 as f32;
+        let (x, y) = if (flags & ARGS_ARE_XY_VALUES) != 0 {
+            (arg1 as f32, arg2 as f32)
+        } else {
+            // This will require significant refactoring, we need access to
+            // points so we should store them instead of using only iterators.
+            println!("warning: need to look up point, offset ignored");
+            (0.0, 0.0)
+        };
         let z = Affine::new(a, b, c, d, x, y);
         self.more = (flags & MORE_COMPONENTS) != 0;
         Some((glyph_index, z))
@@ -924,6 +940,55 @@ impl<'a> Font<'a> {
             None
         }
     }
+
+    /// The number of glyphs in the font.
+    ///
+    /// Limited to 16 bits due to limitations in OpenType.
+    pub fn num_glyphs(&self) -> u16 {
+        self.maxp.num_glyphs()
+    }
+
+    #[cfg(feature = "kurbo")]
+    pub fn get_glyph_path(&self, glyph_ix: u16) -> Option<BezPath> {
+        let _ = self.get_glyph(glyph_ix)?;
+        let affine = Default::default();
+        let mut bp = BezPath::new();
+        self.append_glyph_path(glyph_ix, &affine, &mut bp);
+        Some(bp)
+    }
+
+    #[cfg(feature = "kurbo")]
+    fn append_glyph_path(&self, glyph_ix: u16, z: &Affine, bp: &mut BezPath) {
+        if let Some(glyph) = self.get_glyph(glyph_ix) {
+            match glyph {
+                Glyph::Simple(s) => {
+                    let mut p = s.points();
+                    for n in s.contour_sizes() {
+                        append_kurbo_path(bp, z, &mut path_from_pts(p.by_ref().take(n)));
+                    }
+                }
+                Glyph::Compound(c) => {
+                    for (glyph_ix, affine) in c.components() {
+                        let concat = Affine::concat(z, &affine);
+                        self.append_glyph_path(glyph_ix, &concat, bp);
+                    } 
+                }
+                Glyph::Empty => (),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "kurbo")]
+fn append_kurbo_path<I: Iterator<Item=PathOp>>(bp: &mut BezPath, z: &Affine, path: &mut I) {
+    for op in path {
+        match op {
+            MoveTo(p) => bp.moveto(z * p),
+            LineTo(p) => bp.lineto(z * p),
+            QuadTo(p1, p2) => bp.quadto(z * p1, z * p2),
+        }
+    }
+    bp.closepath()
 }
 
 #[derive(Debug)]

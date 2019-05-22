@@ -2,10 +2,14 @@
 name = "font-rs"
 version = "0.1.3"
 license = "Apache-2.0"
-authors = [ "Raph Levien <raph@google.com>" ]
+authors = [ "Raph Levien <raph.levien@gmail.com>" ]
 keywords = ["font", "truetype", "ttf"]
 description = "A font renderer written (mostly) in pure, safe Rust"
-repository = "https://github.com/google/font-rs"
+repository = "https://github.com/raphlinus/font-rs"
+readme = "README.md"
+
+[dependencies]
+kurbo = { version = "0.2.2", optional = true }
 
 [features]
 sse = []
