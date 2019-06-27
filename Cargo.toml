@@ -9,7 +9,7 @@ repository = "https://github.com/raphlinus/font-rs"
 readme = "README.md"
 
 [dependencies]
-kurbo = { version = "0.2.2", optional = true }
+kurbo = { version = "0.4", optional = true }
 
 [features]
 sse = []

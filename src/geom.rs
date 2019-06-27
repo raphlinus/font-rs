@@ -42,9 +42,9 @@ impl Point {
 }
 
 #[cfg(feature = "kurbo")]
-impl From<Point> for kurbo::Vec2 {
-    fn from(pt: Point) -> kurbo::Vec2 {
-        kurbo::Vec2::new(pt.x as f64, pt.y as f64)
+impl From<Point> for kurbo::Point {
+    fn from(pt: Point) -> kurbo::Point {
+        kurbo::Point::new(pt.x as f64, pt.y as f64)
     }
 }
 

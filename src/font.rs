@@ -983,12 +983,12 @@ impl<'a> Font<'a> {
 fn append_kurbo_path<I: Iterator<Item=PathOp>>(bp: &mut BezPath, z: &Affine, path: &mut I) {
     for op in path {
         match op {
-            MoveTo(p) => bp.moveto(z * p),
-            LineTo(p) => bp.lineto(z * p),
-            QuadTo(p1, p2) => bp.quadto(z * p1, z * p2),
+            MoveTo(p) => bp.move_to(z * p),
+            LineTo(p) => bp.line_to(z * p),
+            QuadTo(p1, p2) => bp.quad_to(z * p1, z * p2),
         }
     }
-    bp.closepath()
+    bp.close_path()
 }
 
 #[derive(Debug)]
