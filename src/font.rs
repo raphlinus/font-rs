@@ -111,16 +111,16 @@ impl<'a> Loca<'a> {
 struct Hhea<'a>(&'a [u8]);
 
 impl<'a> Hhea<'a> {
-    fn ascent(&self) -> Option<u16> {
-        get_u16(self.0, 4)
+    fn ascent(&self) -> Option<i16> {
+        get_i16(self.0, 4)
     }
 
-    fn descent(&self) -> Option<u16> {
-        get_u16(self.0, 6)
+    fn descent(&self) -> Option<i16> {
+        get_i16(self.0, 6)
     }
 
-    fn line_gap(&self) -> Option<u16> {
-        get_u16(self.0, 8)
+    fn line_gap(&self) -> Option<i16> {
+        get_i16(self.0, 8)
     }
 
     fn num_of_long_hor_metrics(&self) -> Option<u16> {
