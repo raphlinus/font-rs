@@ -977,7 +977,8 @@ where
                         }
                         (Some(first_offcurve), None) => {
                             self.alldone = true;
-                            return Some(QuadTo(first_offcurve, self.first_oncurve.unwrap()));
+                            return self.first_oncurve
+                                .map(|oncurve| QuadTo(first_offcurve, oncurve));
                         }
                         (Some(first_offcurve), Some(last_offcurve)) => {
                             self.last_offcurve = None;
