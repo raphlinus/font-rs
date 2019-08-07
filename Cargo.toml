@@ -8,4 +8,7 @@ description = "A font renderer written (mostly) in pure, safe Rust"
 repository = "https://github.com/google/font-rs"
 
 [features]
+default = ["std"]
+
 sse = []
+std = []

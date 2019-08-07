@@ -12,22 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::mem;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(feature = "sse", not(feature = "std")))]
+use core::arch::x86_64::*;
+
+#[cfg(all(feature = "sse", feature = "std"))]
 use std::arch::x86_64::*;
 
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
+#[cfg(all(feature = "sse", not(feature = "std")))]
+use core::mem;
 
-macro_rules! _mm_shuffle {
-    ($z:expr, $y:expr, $x:expr, $w:expr) => {
-        ($z << 6) | ($y << 4) | ($x << 2) | $w
-    };
-}
+#[cfg(all(feature = "sse", feature = "std"))]
+use std::mem;
 
 #[cfg(feature = "sse")]
 pub fn accumulate(src: &[f32]) -> Vec<u8> {
+    macro_rules! _mm_shuffle {
+        ($z:expr, $y:expr, $x:expr, $w:expr) => {
+            ($z << 6) | ($y << 4) | ($x << 2) | $w
+        };
+    }
+
     // SIMD instructions force us to align data since we iterate each 4 elements
     // So:
     // n (0) => 0
@@ -68,9 +75,9 @@ pub fn accumulate(src: &[f32]) -> Vec<u8> {
 
 #[cfg(not(feature = "sse"))]
 pub fn accumulate(src: &[f32]) -> Vec<u8> {
-    let mut acc = 0.0;
-    src.iter()
-        .map(|c| {
+    let mut acc = 0.0f32;
+    src.into_iter()
+        .map(|&c| {
             // This would translate really well to SIMD
             acc += c;
             let y = acc.abs();
@@ -88,8 +95,8 @@ mod tests {
     //  accumulate fn
     fn accumulate_simple_impl(src: &[f32]) -> Vec<u8> {
         let mut acc = 0.0;
-        src.iter()
-            .map(|c| {
+        src.into_iter()
+            .map(|&c| {
                 acc += c;
                 let y = acc.abs();
                 let y = if y < 1.0 { y } else { 1.0 };

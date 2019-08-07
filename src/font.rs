@@ -14,15 +14,33 @@
 
 //! A simple renderer for TrueType fonts
 
-use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use alloc::str;
+#[cfg(not(feature = "std"))]
+use alloc::fmt;
+#[cfg(not(feature = "std"))]
+use alloc::fmt::{Debug, Display, Formatter};
+
+#[cfg(feature = "std")]
+use std::collections::BTreeMap;
+#[cfg(feature = "std")]
+use std::str;
+#[cfg(feature = "std")]
 use std::fmt;
+#[cfg(feature = "std")]
 use std::fmt::{Debug, Display, Formatter};
-use std::result::Result;
 
 use geom::{affine_pt, Affine, Point};
 use raster::Raster;
 
-#[derive(PartialEq, Eq, Hash)]
+#[cfg(not(feature = "std"))]
+use float32::Float32;
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct Tag(u32);
 
 impl Tag {
@@ -34,13 +52,13 @@ impl Tag {
 impl Display for Tag {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let &Tag(tag) = self;
-        let buf = vec![
+        let buf = [
             ((tag >> 24) & 0xff) as u8,
             ((tag >> 16) & 0xff) as u8,
             ((tag >> 8) & 0xff) as u8,
             (tag & 0xff) as u8,
         ];
-        f.write_str(&String::from_utf8(buf).unwrap())
+        f.write_str(str::from_utf8(&buf).unwrap())
     }
 }
 
@@ -710,7 +728,7 @@ impl<'a> CompoundGlyph<'a> {
 
 pub struct Font<'a> {
     _version: u32,
-    _tables: HashMap<Tag, &'a [u8]>,
+    _tables: BTreeMap<Tag, &'a [u8]>,
     head: Head<'a>,
     maxp: Maxp<'a>,
     cmap: Option<Cmap<'a>>,
@@ -794,7 +812,7 @@ impl<'a> Font<'a> {
                 }
             }
             _ => {
-                println!("unhandled glyph case");
+                unreachable!("unhandled glyph case");
             }
         }
     }
@@ -831,8 +849,7 @@ impl<'a> Font<'a> {
                 })
             }
             _ => {
-                println!("glyph {} error", glyph_id);
-                None
+                unreachable!("glyph {} error", glyph_id);
             }
         }
     }
@@ -1049,7 +1066,7 @@ pub fn parse(data: &[u8]) -> Result<Font, FontError> {
     let _search_range = get_u16(data, 6).unwrap();
     let _entry_selector = get_u16(data, 8).unwrap();
     let _range_shift = get_u16(data, 10).unwrap();
-    let mut tables = HashMap::new();
+    let mut tables = BTreeMap::new();
     for i in 0..num_tables {
         let header = &data[12 + i * 16..12 + (i + 1) * 16];
         let tag = get_u32(header, 0).unwrap();

@@ -14,10 +14,14 @@
 
 //! An antialiased rasterizer for quadratic Beziers
 
-use std::cmp::min;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 use accumulate::accumulate;
 use geom::Point;
+
+#[cfg(not(feature = "std"))]
+use float32::Float32;
 
 // TODO: sort out crate structure. Right now we want this when compiling raster as a binary,
 // but need it commented out when compiling showttf
@@ -59,7 +63,8 @@ impl Raster {
         if p0.y < 0.0 {
             x -= p0.y * dxdy;
         }
-        for y in y0..min(self.h, p1.y.ceil() as usize) {
+        let ymin = self.h.min(p1.y.ceil() as usize);
+        for y in y0..ymin {
             let linestart = y * self.w;
             let dy = ((y + 1) as f32).min(p1.y) - (y as f32).max(p0.y);
             let xnext = x + dxdy * dy;

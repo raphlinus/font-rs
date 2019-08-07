@@ -14,6 +14,10 @@
 
 //! Geometry primitive data structures and manipulations
 
+#[cfg(not(feature = "std"))]
+use alloc::fmt::{Debug, Formatter, Result};
+
+#[cfg(feature = "std")]
 use std::fmt::{Debug, Formatter, Result};
 
 #[derive(Copy, Clone)]
