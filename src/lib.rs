@@ -14,6 +14,9 @@
 
 //! A very high performance font renderer.
 
+#[cfg(feature = "kurbo")]
+extern crate kurbo;
+
 #[macro_use]
 pub mod macros;
 pub mod accumulate;

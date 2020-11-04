@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "sse")]
 use std::mem;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(feature = "sse", target_arch = "x86_64"))]
 use std::arch::x86_64::*;
 
-#[cfg(target_arch = "x86")]
+#[cfg(all(feature = "sse", target_arch = "x86"))]
 use std::arch::x86::*;
 
+#[cfg(feature = "sse")]
 macro_rules! _mm_shuffle {
     ($z:expr, $y:expr, $x:expr, $w:expr) => {
         ($z << 6) | ($y << 4) | ($x << 2) | $w
